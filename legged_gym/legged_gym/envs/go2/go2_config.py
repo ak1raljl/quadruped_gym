@@ -10,6 +10,8 @@ class Go2Cfg( LeggedRobotCfg ):
         send_timeouts = True # send time out information to the algorithm
         episode_length_s = 20 # episode length in seconds
         test = False
+        observe_clock_inputs = False
+        observe_gait_commands = True
 
     class init_state( LeggedRobotCfg.init_state ):
         pos = [0.0, 0.0, 0.42] # x,y,z [m]
@@ -58,6 +60,9 @@ class Go2Cfg( LeggedRobotCfg ):
         class scales( LeggedRobotCfg.rewards.scales ):
             torques = -0.0002
             dof_pos_limits = -10.0
+    
+    class commands( LeggedRobotCfg.commands ):
+        pacing_offset = False
 
 
 class Go2CfgPPO( LeggedRobotCfgPPO ):
@@ -66,5 +71,5 @@ class Go2CfgPPO( LeggedRobotCfgPPO ):
     class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
         experiment_name = 'go2'
-        max_iterations = 500
+        max_iterations = 5000
 
