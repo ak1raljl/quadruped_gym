@@ -169,16 +169,12 @@ class Go2Robot( LeggedRobot ):
             self.set_camera(self.cfg.viewer.pos, self.cfg.viewer.lookat)
         self._init_buffers()
         self._prepare_reward_function()
-
         self.init_done = True
 
     def step(self, actions):
         clip_actions = self.cfg.normalization.clip_actions
         self.actions = torch.clip(actions, -clip_actions, clip_actions).to(self.device)
         # step physics and render each frame
-        self.prev_base_pos = self.base_pos.clone()
-        self.prev_base_quat = self.base_quat.clone()
-        self.prev_base_lin_vel = self.base_lin_vel.clone()
         self.prev_foot_velocities = self.foot_velocities.clone()
         self.render()
         for _ in range(self.cfg.control.decimation):
@@ -223,9 +219,7 @@ class Go2Robot( LeggedRobot ):
         self.reset_idx(env_ids)
         self.compute_observations() # in some cases a simulation step might be required to refresh some obs (for example body positions)
 
-        self.last_last_actions[:] = self.last_actions[:]
         self.last_actions[:] = self.actions[:]
-        self.last_last_joint_pos_target[:] = self.last_joint_pos_target[:]
         self.last_joint_pos_target[:] = self.joint_pos_target[:]
         self.last_dof_vel[:] = self.dof_vel[:]
         self.last_root_vel[:] = self.root_states[:, 7:13]
@@ -237,6 +231,7 @@ class Go2Robot( LeggedRobot ):
         self.reset_buf = torch.any(torch.norm(self.contact_forces[:, self.termination_contact_indices, :], dim=-1) > 1., dim=1)
         self.time_out_buf = self.episode_length_buf > self.max_episode_length # no terminal reward for time-outs
         self.reset_buf |= self.time_out_buf
+        # add body height termination criterion
         if self.cfg.rewards.use_terminal_body_height:
             self.body_height_buf = torch.mean(self.root_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1) < self.cfg.rewards.terminal_body_height
             self.reset_buf = torch.logical_or(self.body_height_buf, self.reset_buf)
@@ -255,11 +250,10 @@ class Go2Robot( LeggedRobot ):
         self._call_train_eval(self._reset_root_states, env_ids)
         # reset buffers
         self.last_actions[env_ids] = 0.
-        self.last_last_actions[env_ids] = 0.
         self.last_dof_vel[env_ids] = 0.
         self.feet_air_time[env_ids] = 0.
         self.episode_length_buf[env_ids] = 0
-        self.reset_buf[env_ids] = 0
+        self.reset_buf[env_ids] = 1
         # fill extras
         self.extras['episode'] = {}
         for key in self.episode_sums.keys():
@@ -273,6 +267,8 @@ class Go2Robot( LeggedRobot ):
         # send timeout info to the algorithm
         if self.cfg.env.send_timeouts:
             self.extras["time_outs"] = self.time_out_buf
+        
+        # log additional command info
         if self.cfg.commands.command_curriculum:
             self.extras["env_bins"] = torch.Tensor(self.env_command_bins)[:self.num_train_envs]
             self.extras["episode"]["min_command_duration"] = torch.min(self.commands[:, 8])
@@ -307,45 +303,12 @@ class Go2Robot( LeggedRobot ):
         for i in range(len(self.lag_buffer)):
             self.lag_buffer[i][env_ids, :] = 0
 
-        
-    def set_idx_pose(self, env_ids, dof_pos, base_state):
-        if len(env_ids) == 0:
-            return
-        env_ids_int32 = env_ids.to(dtype=torch.int32).to(self.device)
-
-        # joints
-        if dof_pos is not None:
-            self.dof_pos[env_ids] = dof_pos
-            self.dof_vel[env_ids] = 0.
-
-            self.gym.set_dof_state_tensor_indexed(
-                self.sim,
-                gymtorch.unwrap_tensor(self.dof_state),
-                gymtorch.unwrap_tensor(env_ids_int32),
-                len(env_ids_int32)
-            )
-        # base position
-        self.root_states[env_ids] = base_state.to(self.device)
-
-        self.gym.set_actor_root_state_tensor_indexed(
-            self.sim,
-            gymtorch.unwrap_tensor(self.root_states),
-            gymtorch.unwrap_tensor(env_ids_int32), 
-            len(env_ids_int32)
-        )
-
     def compute_reward(self):
         self.rew_buf[:] = 0.
-        self.rew_buf_pos[:] = 0.
-        self.rew_buf_neg[:] = 0.
         for i in range(len(self.reward_functions)):
             name = self.reward_names[i]
             rew = self.reward_functions[i]() * self.reward_scales[name]
-            self.rew_buf += rew
-            if torch.sum(rew) >= 0:
-                self.rew_buf_pos += rew
-            elif torch.sum(rew) <= 0:
-                self.rew_buf_neg += rew
+            self.rew_buf += rew #TODO add positive and negative reward buffers
             self.episode_sums[name] += rew
             if name in ['tracking_contacts_shaped_force', 'tracking_contacts_shaped_vel']:
                 self.command_sums[name] += self.reward_scales[name] + rew
@@ -353,7 +316,7 @@ class Go2Robot( LeggedRobot ):
                 self.command_sums[name] += rew
         if self.cfg.rewards.only_positive_rewards:
             self.rew_buf[:] = torch.clip(self.rew_buf[:], min=0.)
-        self.episode_sums["total"] += self.rew_buf
+        # self.episode_sums["total"] += self.rew_buf
         # add termination reward after clipping
         if "termination" in self.reward_scales:
             rew = self.reward_container._reward_termination() * self.reward_scales["termination"]
@@ -368,7 +331,6 @@ class Go2Robot( LeggedRobot ):
         self.command_sums["ep_timesteps"] += 1
 
     def compute_observations(self):
-        
         if self.cfg.env.observe_command:
             self.obs_buf = torch.cat((  
                 self.projected_gravity,
@@ -396,35 +358,13 @@ class Go2Robot( LeggedRobot ):
         if self.add_noise:
             self.obs_buf += (2 * torch.rand_like(self.obs_buf) - 1) * self.noise_scale_vec
         
-        # build privileged obs
-        self.privileged_obs_buf = torch.empty(self.num_envs, 0).to(self.device)
-        self.next_privileged_obs_buf = torch.empty(self.num_envs, 0).to(self.device)
-        if self.cfg.env.priv_observe_friction:
-            friction_coeffs_scale, friction_coeffs_shift = get_scale_shift(self.cfg.normalization.friction_range)
-            self.privileged_obs_buf = torch.cat((
-                self.privileged_obs_buf,
-                (self.friction_coeffs[:, 0].unsqueeze(1) - friction_coeffs_shift) * friction_coeffs_scale
-            ), dim=1)
-            self.next_privileged_obs_buf = torch.cat((
-                self.next_privileged_obs_buf,
-                (self.friction_coeffs[:, 0].unsqueeze(1) - friction_coeffs_shift) * friction_coeffs_scale
-            ), dim=1)
-        if self.cfg.env.priv_observe_restitution:
-            restitutions_scale, restitutions_shift = get_scale_shift(self.cfg.normalization.restitution_range)
-            self.privileged_obs_buf = torch.cat((
-                self.privileged_obs_buf,
-                (self.restitutions[:, 0].unsqueeze(1) - restitutions_shift) * restitutions_scale
-            ), dim=1)
-            self.next_privileged_obs_buf = torch.cat((
-                self.next_privileged_obs_buf,
-                (self.restitutions[:, 0].unsqueeze(1) - restitutions_shift) * restitutions_scale
-            ), dim=1)
-        assert self.privileged_obs_buf.shape[1] == self.cfg.env.num_privileged_obs, f"num_privileged_obs ({self.cfg.env.num_privileged_obs}) != the number of privileged observations ({self.privileged_obs_buf.shape[1]}), you will discard data from the student!"
+        #TODO build privileged obs
    
     def set_main_agent_pose(self, loc, quat):
         self.root_states[0, 0:3] = torch.Tensor(loc)
         self.root_states[0, 3:7] = torch.Tensor(quat)
         self.gym.set_actor_root_state_tensor(self.sim, gymtorch.unwrap_tensor(self.root_states))
+    
     #------------- Callbacks --------------
     def _call_train_eval(self, func, env_ids):
         env_ids = env_ids[env_ids != self.num_envs]
@@ -1179,9 +1119,6 @@ class Go2Robot( LeggedRobot ):
         self.episode_sums = {
             name: torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)
             for name in self.reward_scales.keys()}
-        self.episode_sums["total"] = torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)
-        self.episode_sums_eval = {name: -1 * torch.ones(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False) for name in self.reward_scales.keys()}
-        self.episode_sums_eval["total"] = torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)
         self.command_sums = {name: torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False) for name in list(self.reward_scales.keys()) + ["lin_vel_raw", "ang_vel_raw", "lin_vel_residual", "ang_vel_residual", "ep_timesteps"]}
     
     def _create_envs(self):

@@ -10,8 +10,14 @@ class Go2Cfg( LeggedRobotCfg ):
         send_timeouts = True # send time out information to the algorithm
         episode_length_s = 20 # episode length in seconds
         test = False
-        observe_clock_inputs = False
+        # additional settings
         observe_gait_commands = True
+        observe_command = True
+        observe_two_prev_actions = True
+        observe_timing_parameter = True
+        observe_clock_inputs = True
+        observe_contact_states = True
+
 
     class init_state( LeggedRobotCfg.init_state ):
         pos = [0.0, 0.0, 0.42] # x,y,z [m]
