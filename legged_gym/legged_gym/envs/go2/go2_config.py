@@ -3,7 +3,7 @@ from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobot
 class Go2Cfg( LeggedRobotCfg ):
     class env:
         num_envs = 4096
-        num_observations = 75
+        num_observations = 70
         num_privileged_obs = None # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise 
         num_actions = 12
         env_spacing = 3.  # not used with heightfields/trimeshes 
@@ -15,7 +15,7 @@ class Go2Cfg( LeggedRobotCfg ):
         observe_two_prev_actions = True
         observe_timing_parameter = True
         observe_clock_inputs = True
-        observe_contact_states = True
+        observe_contact_states = False
         observe_yaw = False
 
 
@@ -40,8 +40,7 @@ class Go2Cfg( LeggedRobotCfg ):
 
     class terrain( LeggedRobotCfg.terrain ):
         mesh_type = 'plane' # "heightfield" # none, plane, heightfield or trimesh
-        measure_heights = False
-        teleport_robots = True
+        measure_heights = True
         border_size = 50
         teleport_thresh = 0.3 # height threshold for teleporting robots
         x_init_range = 1.
@@ -72,17 +71,17 @@ class Go2Cfg( LeggedRobotCfg ):
     class rewards( LeggedRobotCfg.rewards ):
         use_terminal_body_height = True
         soft_dof_pos_limit = 0.9
-        base_height_target = 0.30
+        base_height_target = 0.34
         kappa_gait_probs = 0.07
         terminal_body_height = 0.05
         class scales( LeggedRobotCfg.rewards.scales ):
-            tracking_lin_vel = 1.0
+            tracking_lin_vel = 10.0
             tracking_ang_vel = 0.5
             torques = -0.0001
             dof_pos_limits = -10.0
             orientation = -0.0
             orientation_control = -5.0
-            base_height = 0.0
+            base_height = -2.0
             feet_air_time = 0.0
             collision = -5.0
             tracking_contacts_shaped_force = 1.0#4.0
@@ -100,24 +99,20 @@ class Go2Cfg( LeggedRobotCfg ):
         command_curriculum = True
         resampling_time = 10
         heading_command = False
-        curriculum_type = "RewardThresholdCurriculum"
-        lipschitz_threshold = 0.9
-        num_commands = 15
 
-        curriculum_seed = 100
+        num_commands = 14
 
         lin_vel_x = [-1.0, 1.0] # min max [m/s]
         lin_vel_y = [-1.0, 1.0] # min max [m/s]
         ang_vel_yaw = [-1, 1]   # min max [rad/s]
         heading = [-3.14, 3.14]
-        body_height_cmd = [-0.25, 0.15]
-        impulse_height_commands = False
+        body_height_cmd = [-0.1, 0.1]
 
         limit_vel_x = [-5.0, 5.0]
         limit_vel_y = [-0.6, 0.6]
         limit_vel_yaw = [-5.0, 5.0]
-        limit_body_height = [-0.25, 0.15]
-        limit_gait_phase = [0, 1.0]
+        limit_body_height = [-0.01, 0.01]
+        limit_gait_phase = [0.0, 1.0]
         limit_gait_offset = [0.0, 1.0]
         limit_gait_bound = [0.0, 1.0]
         limit_gait_frequency = [2.0, 4.0]
@@ -130,24 +125,6 @@ class Go2Cfg( LeggedRobotCfg ):
         limit_stance_width = [0.10, 0.45]
         limit_stance_length = [0.35, 0.45]
 
-        num_bins_vel_x = 21
-        num_bins_vel_y = 1
-        num_bins_vel_yaw = 21
-        num_bins_body_height = 1
-        num_bins_gait_frequency = 1
-        num_bins_gait_phase = 1
-        num_bins_gait_offset = 1
-        num_bins_gait_bound = 1
-        num_bins_gait_duration = 1
-        num_bins_footswing_height = 1
-        num_bins_body_pitch = 1
-        num_bins_body_roll = 1
-        num_bins_aux_reward_coef = 1
-        num_bins_compliance = 1
-        num_bins_compliance = 1
-        num_bins_stance_width = 1
-        num_bins_stance_length = 1
-
         gait_phase_cmd_range = [0.0, 1.0]
         gait_offset_cmd_range = [0.0, 1.0]
         gait_bound_cmd_range = [0.0, 1.0]
@@ -156,30 +133,20 @@ class Go2Cfg( LeggedRobotCfg ):
         footswing_height_range = [0.03, 0.35]
         body_pitch_range = [-0.4, 0.4]
         body_roll_range = [-0.0, 0.0]
-        aux_reward_coef_range = [0.0, 0.01]
-        compliance_range = [0.0, 0.01]
         stance_width_range = [0.10, 0.45]
         stance_length_range = [0.35, 0.45]
 
-        exclusive_phase_offset = True
         binary_phases = False
-        pacing_offset = False
-        balance_gait_distribution = True
-        gaitwise_curricula = True
 
     class domain_rand( LeggedRobotCfg.domain_rand ):
-        randomize_lag_timesteps = True
         randomize_base_mass = True
         added_mass_range = [-1.0, 3.0]
         push_robots = False
         max_push_vel_xy = 0.5
         randomize_friction = True
         friction_range = [0.1, 3.0]
-        rand_interval_s = 4.0
         push_interval_s = 15
-        gravity_rand_interval_s = 8.0
         gravity_impulse_duration = 0.99
-        lag_timesteps = 6
 
     class normalization( LeggedRobotCfg.normalization ):
         friction_range = [0, 1]
@@ -195,7 +162,6 @@ class Go2Cfg( LeggedRobotCfg ):
             body_roll_cmd = 0.3
             stance_width_cmd = 1.0
             stance_length_cmd = 1.0
-            aux_reward_cmd = 1.0
 
     class curriculum_thresholds:
         tracking_lin_vel = 0.8  # closer to 1 is tighter
@@ -213,5 +179,4 @@ class Go2CfgPPO( LeggedRobotCfgPPO ):
     class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
         experiment_name = 'go2'
-        max_iterations = 500
-
+        max_iterations = 1500
