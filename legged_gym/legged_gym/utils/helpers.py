@@ -188,6 +188,21 @@ def export_policy_as_jit(actor_critic, path):
         model = copy.deepcopy(actor_critic.actor).to('cpu')
         traced_script_module = torch.jit.script(model)
         traced_script_module.save(path)
+    
+def export_policy_as_onnx(actor_critic, path):
+    model = copy.deepcopy(actor_critic.actor).to('cpu')
+    actor_input = torch.randn(1, 68)
+
+    body_onnx_path = '/home/ak1ra/Quadruped/go2_sim2sim/go2_description/onnx/' + 'legged.onnx'
+    paths = [body_onnx_path]
+    for path in paths:
+        if os.path.exists(path):
+            os.remove(path)
+            print(f"deleted: {path}")
+        else:
+            print(f"file not found: {path}")
+    print("path:",body_onnx_path)
+    torch.onnx.export(model, actor_input, body_onnx_path, opset_version=11)
 
 
 class PolicyExporterLSTM(torch.nn.Module):
