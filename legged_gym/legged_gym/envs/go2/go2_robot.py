@@ -255,20 +255,20 @@ class Go2Robot( LeggedRobot ):
         ).squeeze(1)
         # body roll
         self.commands[env_ids, 11] = 0.0
-        # stance_width
-        self.commands[env_ids, 12] = torch_rand_float(
-            self.cfg.commands.stance_width_range[0],
-            self.cfg.commands.stance_width_range[1],
-            (len(env_ids), 1),
-            device=self.device
-        ).squeeze(1)
-        # stance_length
-        self.commands[env_ids, 13] = torch_rand_float(
-            self.cfg.commands.stance_length_range[0],
-            self.cfg.commands.stance_length_range[1],
-            (len(env_ids), 1),
-            device=self.device
-        ).squeeze(1)
+        # # stance_width
+        # self.commands[env_ids, 12] = torch_rand_float(
+        #     self.cfg.commands.stance_width_range[0],
+        #     self.cfg.commands.stance_width_range[1],
+        #     (len(env_ids), 1),
+        #     device=self.device
+        # ).squeeze(1)
+        # # stance_length
+        # self.commands[env_ids, 13] = torch_rand_float(
+        #     self.cfg.commands.stance_length_range[0],
+        #     self.cfg.commands.stance_length_range[1],
+        #     (len(env_ids), 1),
+        #     device=self.device
+        # ).squeeze(1)
 
         self.commands[env_ids, :2] *= (torch.norm(self.commands[env_ids, :2], dim=1) > 0.2).unsqueeze(1)
 
@@ -440,9 +440,9 @@ class Go2Robot( LeggedRobot ):
             self.obs_scales.gait_phase_cmd,
             self.obs_scales.footswing_height_cmd, 
             self.obs_scales.body_pitch_cmd,
-            self.obs_scales.body_roll_cmd, 
-            self.obs_scales.stance_width_cmd,
-            self.obs_scales.stance_length_cmd
+            self.obs_scales.body_roll_cmd
+            # self.obs_scales.stance_width_cmd,
+            # self.obs_scales.stance_length_cmd
         ], device=self.device, requires_grad=False, )[:self.cfg.commands.num_commands]
         self.feet_air_time = torch.zeros(self.num_envs, self.feet_indices.shape[0], dtype=torch.float, device=self.device, requires_grad=False)
         self.last_contacts = torch.zeros(self.num_envs, len(self.feet_indices), dtype=torch.bool, device=self.device, requires_grad=False)
@@ -481,14 +481,8 @@ class Go2Robot( LeggedRobot ):
         self.gravity_vec = to_torch(get_axis_params(-1., self.up_axis_idx), device=self.device).repeat((self.num_envs, 1))
         self.gait_indices = torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)
         self.clock_inputs = torch.zeros(self.num_envs, 4, dtype=torch.float, device=self.device, requires_grad=False)
-        self.doubletime_clock_inputs = torch.zeros(self.num_envs, 4, dtype=torch.float, device=self.device, requires_grad=False)
-        self.halftime_clock_inputs = torch.zeros(self.num_envs, 4, dtype=torch.float, device=self.device, requires_grad=False)
 
-    
     def _prepare_reward_function(self):
-        """ Prepares a list of reward functions, whcih will be called to compute the total reward.
-            Looks for self._reward_<REWARD_NAME>, where <REWARD_NAME> are names of all non zero reward scales in the cfg.
-        """
         # remove zero scales + multiply non-zero ones by dt
         for key in list(self.reward_scales.keys()):
             scale = self.reward_scales[key]
@@ -515,14 +509,6 @@ class Go2Robot( LeggedRobot ):
         }
 
     def _create_envs(self):
-        """ Creates environments:
-             1. loads the robot URDF/MJCF asset,
-             2. For each environment
-                2.1 creates the environment, 
-                2.2 calls DOF and Rigid shape properties callbacks,
-                2.3 create actor with these properties and add them to the env
-             3. Store indices of different bodies of the robot
-        """
         asset_path = self.cfg.asset.file.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
         asset_root = os.path.dirname(asset_path)
         asset_file = os.path.basename(asset_path)
@@ -623,16 +609,31 @@ class Go2Robot( LeggedRobot ):
 
     #------------ reward functions----------------
     def _reward_tracking_contacts_shaped_force(self):
+        '''
+            惩罚在摆动相(swing phase)时脚与地面的意外接触
+                >当脚应该离地时(desired_contact = 0),如果仍有接触力,给予惩罚
+                >当脚应该着地时(desired_contact = 1),不进行惩罚
+        '''
+        # calculate contact forces on feet
         foot_forces = torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1)
+        # get desired_contact_states
         desired_contact = self.desired_contact_states
         reward = 0
+        # sum over 4 feet
         for i in range(4):
-            reward += -(1 - desired_contact[:, i]) * (1 - torch.exp(-1 * foot_forces[:, i] ** 2 / 100.))
+            reward += - (1 - desired_contact[:, i]) * (1 - torch.exp(-1 * foot_forces[:, i] ** 2 / 100.))
         
         return reward / 4
 
     def _reward_tracking_contacts_shaped_vel(self):
+        '''
+            惩罚在支撑相(stance phase)时脚的滑动
+                >当脚应该着地时(desired_contact = 1),如果仍有速度,给予惩罚
+                >当脚应该离地时(desired_contact = 0),不进行惩罚
+        '''
+        # calculate contact forces on feet
         foot_velocities = torch.norm(self.foot_velocities, dim=2).view(self.num_envs, -1)
+        # get desired_contact_states
         desired_contact = self.desired_contact_states
         reward = 0
         for i in range(4):
@@ -641,14 +642,31 @@ class Go2Robot( LeggedRobot ):
         return reward / 4
     
     def _reward_feet_contact_vel(self):
+        '''
+            惩罚脚在接近地面时的运动速度,鼓励轻柔着地
+                >防止脚猛烈拍击地面 (stomping)
+                >鼓励平缓着地 (soft landing)
+                >减少冲击力,保护硬件
+        '''
+        # set reference heights
         reference_heights = 0
+        # measure if feet touch the ground
         near_ground = self.foot_positions[:, :, 2] - reference_heights < 0.03
         foot_velocities = torch.square(torch.norm(self.foot_velocities[:, :, 0:3], dim=2).view(self.num_envs, -1))
+        # penalize high foot velocities when close to the ground
         rew_contact_vel = torch.sum(near_ground * foot_velocities, dim=1)
 
         return rew_contact_vel
     
     def _reward_feet_clearance_cmd_linear(self):
+        '''
+            在摆动相引导脚按照指定的高度轨迹运动,形成抛物线式的抬腿动作
+                >鼓励脚在摆动中期达到命令指定的最大高度
+                >保证摆动轨迹平滑
+                >避免障碍物
+                >避免过度抬脚
+        '''
+        # get triangular phases for each foot
         phases = 1 - torch.abs(1.0 - torch.clip((self.foot_indices * 2.0) - 1.0, 0.0, 1.0) * 2.0)
         foot_height = (self.foot_positions[:, :, 2]).view(self.num_envs, -1)# - reference_heights
         target_height = self.commands[:, 9].unsqueeze(1) * phases + 0.02 # offset for foot radius 2cm
@@ -657,9 +675,18 @@ class Go2Robot( LeggedRobot ):
         return torch.sum(rew_foot_clearance, dim=1)
 
     def _reward_feet_impact_vel(self):
+        '''
+            获取着地瞬间的垂直冲击速度,惩罚猛烈下落
+                >只在实际发生接触时惩罚
+                >只惩罚垂直方向的速度
+                >使用上一步的速度,避免当前步的接触力影响
+                >鼓励零速着地或向上缓冲
+        '''
+        # calculate vertical foot velocities at previous step
         prev_foot_velocities = self.prev_foot_velocities[:, :, 2].view(self.env.num_envs, -1)
+        # measure if feet are in contact
         contact_states = torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1) > 1.0
-
+        # penalize high downward velocities when in contact
         rew_foot_impact_vel = contact_states * torch.square(torch.clip(prev_foot_velocities, -100, 0))
 
         return torch.sum(rew_foot_impact_vel, dim=1)

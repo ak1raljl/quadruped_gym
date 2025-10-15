@@ -3,7 +3,7 @@ from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobot
 class Go2Cfg( LeggedRobotCfg ):
     class env:
         num_envs = 4096
-        num_observations = 70
+        num_observations = 68
         num_privileged_obs = None # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise 
         num_actions = 12
         env_spacing = 3.  # not used with heightfields/trimeshes 
@@ -56,7 +56,6 @@ class Go2Cfg( LeggedRobotCfg ):
         damping = {'joint': 0.6}     # [N*m*s/rad]
         # action scale: target angle = actionScale * action + defaultAngle
         action_scale = 0.25
-        hip_scale_reduction = 0.5
         # decimation: Number of control action updates @ sim DT per policy DT
         decimation = 4
 
@@ -75,38 +74,39 @@ class Go2Cfg( LeggedRobotCfg ):
         kappa_gait_probs = 0.07
         terminal_body_height = 0.05
         class scales( LeggedRobotCfg.rewards.scales ):
-            tracking_lin_vel = 10.0
+            tracking_lin_vel = 5.0
             tracking_ang_vel = 0.5
             torques = -0.0001
             dof_pos_limits = -10.0
-            orientation = -0.0
-            orientation_control = -5.0
-            base_height = -2.0
+            orientation = -5.0
+            # orientation_control = -5.0
+            base_height = -100.0
             feet_air_time = 0.0
             collision = -5.0
-            tracking_contacts_shaped_force = 1.0#4.0
-            tracking_contacts_shaped_vel = 1.0#4.0
-            feet_clearance_cmd_linear = 1.0#-30.0
-            raibert_heuristic = 1.0#-10.0
+            tracking_contacts_shaped_force = 4.0
+            tracking_contacts_shaped_vel = 4.0
+            feet_clearance_cmd_linear = -10.0
+            # raibert_heuristic = -2.0
             dof_vel = -1e-4
             dof_pos = -0.0
             feet_impact_vel = -0.0
             feet_clearance = -0.0
             feet_clearance_cmd = -0.0
             feet_contact_forces = 0.0
+            action_rate = -0.01
 
     class commands( LeggedRobotCfg.commands ):
         command_curriculum = True
         resampling_time = 10
         heading_command = False
 
-        num_commands = 14
+        num_commands = 12
 
         lin_vel_x = [-1.0, 1.0] # min max [m/s]
         lin_vel_y = [-1.0, 1.0] # min max [m/s]
         ang_vel_yaw = [-1, 1]   # min max [rad/s]
         heading = [-3.14, 3.14]
-        body_height_cmd = [-0.1, 0.1]
+        body_height_cmd = [0.32, 0.35]
 
         limit_vel_x = [-5.0, 5.0]
         limit_vel_y = [-0.6, 0.6]
@@ -118,7 +118,7 @@ class Go2Cfg( LeggedRobotCfg ):
         limit_gait_frequency = [2.0, 4.0]
         limit_gait_duration = [0.5, 0.5]
         limit_footswing_height = [0.03, 0.35]
-        limit_body_pitch = [-0.4, 0.4]
+        limit_body_pitch = [-0.1, 0.1]
         limit_body_roll = [-0.0, 0.0]
         limit_aux_reward_coef = [0.0, 0.01]
         limit_compliance = [0.0, 1.0]
@@ -131,10 +131,10 @@ class Go2Cfg( LeggedRobotCfg ):
         gait_frequency_cmd_range = [2.0, 4.0]
         gait_duration_cmd_range = [0.5, 0.5]
         footswing_height_range = [0.03, 0.35]
-        body_pitch_range = [-0.4, 0.4]
+        body_pitch_range = [-0.0, 0.0]
         body_roll_range = [-0.0, 0.0]
-        stance_width_range = [0.10, 0.45]
-        stance_length_range = [0.35, 0.45]
+        stance_width_range = [0.30, 0.35]
+        stance_length_range = [0.34, 0.38]
 
         binary_phases = False
 
@@ -154,7 +154,7 @@ class Go2Cfg( LeggedRobotCfg ):
         clip_actions = 10.0
         class obs_scales( LeggedRobotCfg.normalization.obs_scales ):
             imu = 0.1
-            body_height_cmd = 2.0
+            body_height_cmd = 1.0
             gait_freq_cmd = 1.0
             gait_phase_cmd = 1.0
             footswing_height_cmd = 0.15
@@ -162,12 +162,6 @@ class Go2Cfg( LeggedRobotCfg ):
             body_roll_cmd = 0.3
             stance_width_cmd = 1.0
             stance_length_cmd = 1.0
-
-    class curriculum_thresholds:
-        tracking_lin_vel = 0.8  # closer to 1 is tighter
-        tracking_ang_vel = 0.7
-        tracking_contacts_shaped_force = 0.9  # closer to 1 is tighter
-        tracking_contacts_shaped_vel = 0.9
     
     class noise( LeggedRobotCfg.noise ):
         class noise_scales( LeggedRobotCfg.noise.noise_scales ):
