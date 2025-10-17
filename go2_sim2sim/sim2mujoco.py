@@ -8,12 +8,8 @@ from legged_gym import LEGGED_GYM_ROOT_DIR
 from legged_gym.utils import Logger
 import torch
 from pynput import keyboard
-
-from unitree_sdk2py.core.channel import ChannelPublisher, ChannelSubscriber
-from unitree_sdk2py.core.channel import ChannelFactoryInitialize
-from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
-from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_
-from unitree_sdk2py.utils.crc import CRC
+import sys
+import time
 
 x_vel_cmd, y_vel_cmd, yaw_vel_cmd = 0.0, 0.0, 0.0
 x_vel_max, y_vel_max, yaw_vel_max = 1.5, 1.0, 3.0
@@ -43,6 +39,7 @@ def on_press(key):
         pass
 
 def quaternion_to_euler_array(quat):
+    # Ensure quaternion is in the correct format [x, y, z, w]
     x, y, z, w = quat
     # Roll (x-axis rotation)
     t0 = +2.0 * (w * x + y * z)
@@ -59,7 +56,9 @@ def quaternion_to_euler_array(quat):
     
     return np.array([roll_x, pitch_y, yaw_z])
 
-def get_obs(data, model):
+def get_obs(data):
+    '''Extracts an observation from the mujoco data structure
+    '''
     base_pos = data.qpos[0:3].astype(np.double)
     dof_pos = data.qpos[7:19].astype(np.double)
     dof_vel = data.qvel[6:].astype(np.double)
@@ -67,31 +66,38 @@ def get_obs(data, model):
     r = R.from_quat(quat)
     base_lin_vel = r.apply(data.qvel[:3], inverse=True).astype(np.double)
     base_ang_vel = data.qvel[3:6].astype(np.double)
-    projected_gravity = r.apply(np.array([0., 0., -1.]), inverse=True).astype(np.double)
     
+    projected_gravity = r.apply(np.array([0., 0., -1.]), inverse=True).astype(np.double)
+
     return base_pos, dof_pos, dof_vel, quat, base_lin_vel, base_ang_vel, projected_gravity
 
+def pd_control(target_q, q, kp, target_dq, dq, kd):
+    '''Calculates torques from position commands
+    '''
+    # 注意：target_q应该已经包含了default_dof_pos
+    torque_out = (target_q - q) * kp + (target_dq - dq) * kd
+    return torque_out
 
 def run_mujoco(policy, cfg):
-    listener = keyboard.Listener(on_press=on_press)
-    listener.start()
+    # listener = keyboard.Listener(on_press=on_press)
+    # listener.start()
     
     model = mujoco.MjModel.from_xml_path(cfg.sim_config.mujoco_model_path)
     model.opt.timestep = cfg.sim_config.dt
     data = mujoco.MjData(model)
     
-    data.qpos[-cfg.env.num_actions:] = cfg.robot_config.default_dof_pos
-    mujoco.mj_step(model, data)
+    # 设置初始状态
+    data.qpos[2] = 0.42  # 设置初始高度
+    default_dof_pos = cfg.robot_config.default_dof_pos
+    data.qpos[7:19] = default_dof_pos  # 设置初始关节角度
+    mujoco.mj_forward(model, data)  # 更新物理状态
     
     viewer = mujoco.viewer.launch_passive(model, data)
-    # viewer.cam.distance = 3.0
-    # viewer.cam.azimuth = 90
-    # viewer.cam.elevation = -45
-    # viewer.cam.lookat[:] = np.array([0.0, -0.25, 0.42])
-    
-    target_q = np.zeros(cfg.env.num_actions, dtype=np.double)
+
+    torques = np.zeros(cfg.env.num_actions, dtype=np.double)
     actions = np.zeros(cfg.env.num_actions, dtype=np.double)
     last_actions = np.zeros(cfg.env.num_actions, dtype=np.double)
+    default_dof_vel = np.zeros(cfg.env.num_actions, dtype=np.double)  # 默认关节速度为0
 
     hist_obs = deque()
     for _ in range(cfg.env.frame_stack):
@@ -101,7 +107,7 @@ def run_mujoco(policy, cfg):
     commands = np.array([x_vel_cmd, y_vel_cmd, yaw_vel_cmd])
     
     # 步态参数（与训练配置一致）
-    gait_freq = 3.0  # Hz
+    gait_freq = 2.0  # Hz
     gait_phase = 0.5
     gait_offset = 0.0
     gait_bound = 0.0
@@ -117,7 +123,7 @@ def run_mujoco(policy, cfg):
 
     for step in range(int(cfg.sim_config.sim_duration / cfg.sim_config.dt)):
         # 获取观测
-        base_pos, dof_pos, dof_vel, quat, base_lin_vel, base_ang_vel, projected_gravity = get_obs(data, model)
+        base_pos, dof_pos, dof_vel, quat, base_lin_vel, base_ang_vel, projected_gravity = get_obs(data)
 
         gait_indices = (gait_indices + gait_freq * cfg.sim_config.dt) % 1.0
         
@@ -129,11 +135,20 @@ def run_mujoco(policy, cfg):
             (gait_indices + gait_phase) % 1.0,  # RR
         ], dtype=np.float32)
 
-        foot_indices = np.remainder(foot_indices, 1.0)
+        # foot_indices = np.remainder(foot_indices, 1.0)
+        transformed_indices = np.zeros(4, dtype=np.float32)
+        for i in range(4):
+            phase = foot_indices[i]
+            if phase < gait_duration:
+                # 支撑相：[0, duration] -> [0, 0.5]
+                transformed_indices[i] = phase * (0.5 / gait_duration)
+            else:
+                # 摆动相：[duration, 1] -> [0.5, 1]
+                transformed_indices[i] = 0.5 + (phase - gait_duration) * (0.5 / (1.0 - gait_duration))
 
-        clock_inputs = np.sin(2 * np.pi * foot_indices)
+        clock_inputs = np.sin(2 * np.pi * transformed_indices)
 
-        # 策略推理
+        # 1000hz -> 100hz
         if count_lowlevel % cfg.sim_config.decimation == 0:
             obs = np.zeros([1, cfg.env.num_single_obs], dtype=np.float32)
             # projected_gravity
@@ -162,7 +177,7 @@ def run_mujoco(policy, cfg):
             obs[0, 13] = body_roll * cfg.normalization.obs_scales.body_roll_cmd
 
             # dof_pos
-            obs[0, 14:26] = dof_pos * cfg.normalization.obs_scales.dof_pos
+            obs[0, 14:26] = (dof_pos - default_dof_pos) * cfg.normalization.obs_scales.dof_pos
             # dof_vel
             obs[0, 26:38] = dof_vel * cfg.normalization.obs_scales.dof_vel
             # actions
@@ -192,11 +207,29 @@ def run_mujoco(policy, cfg):
             actions = np.clip(actions, -cfg.normalization.clip_actions, cfg.normalization.clip_actions)
             actions_scaled = actions * cfg.control.action_scale
             
-            if _ < 10:
-                torques = np.zeros_like(dof_pos)
-            else:
-                torques = cfg.robot_config.kps * (actions_scaled - dof_pos) - cfg.robot_config.kds * dof_vel
-                torques = np.clip(torques, -cfg.robot_config.tau_limit, cfg.robot_config.tau_limit)
+        target_dq = np.zeros(cfg.env.num_actions, dtype=np.double)
+        target_dq = np.zeros(cfg.env.num_actions, dtype=np.double)
+        if step < 50:
+            # 前50步让机器人稳定在初始姿态
+            torques = pd_control(
+                target_q=default_dof_pos,
+                q=dof_pos,
+                kp=cfg.robot_config.kps,
+                target_dq=target_dq,
+                dq=dof_vel,
+                kd=cfg.robot_config.kds
+            )
+        else:
+            # 目标角度 = 默认角度 + 动作偏移
+            torques = pd_control(
+                target_q=default_dof_pos + actions_scaled,
+                q=dof_pos,
+                kp=cfg.robot_config.kps,
+                target_dq=target_dq,
+                dq=dof_vel,
+                kd=cfg.robot_config.kds
+            )
+        torques = np.clip(torques, -cfg.robot_config.tau_limit, cfg.robot_config.tau_limit)
         data.ctrl = torques
         
         mujoco.mj_step(model, data)
@@ -219,19 +252,19 @@ if __name__ == '__main__':
         class sim_config:
             mujoco_model_path = args.mujoco_model
             sim_duration = 120.0
-            dt = 0.005
+            dt = 0.001
             decimation = 4
         
         class robot_config:
-            kps = np.array([25.0] * 12, dtype=np.double)  # stiffness.joint = 25.0
-            kds = np.array([0.6] * 12, dtype=np.double)   # damping.joint = 0.6
+            kps = np.array([25.0] * 12, dtype=np.double)  # 与Isaac Gym保持一致：25.0
+            kds = np.array([0.6] * 12, dtype=np.double)   # 与Isaac Gym保持一致：0.6
             tau_limit = 40 * np.ones(12, dtype=np.double)
             
             default_dof_pos = np.array([
-                0.1, 0.8, -1.5,   # FL
-                0.1, 1.0, -1.5,   # RL
-                -0.1, 0.8, -1.5,  # FR
-                -0.1, 1.0, -1.5,  # RR
+                0.0, 0.8, -1.5,   # FL
+                0.0, 1.0, -1.5,   # RL
+                -0.0, 0.8, -1.5,  # FR
+                -0.0, 1.0, -1.5,  # RR
             ], dtype=np.double)
         
         class env(Go2Cfg.env):

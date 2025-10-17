@@ -52,6 +52,7 @@ def play(args):
 
     # prepare environment
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
+    print(env.dof_names)
     obs = env.get_observations()
     # load policy
     train_cfg.runner.resume = True
@@ -62,7 +63,7 @@ def play(args):
     if EXPORT_POLICY:
         path = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, 'exported', 'policies')
         export_policy_as_jit(ppo_runner.alg.actor_critic, path)
-        export_policy_as_onnx(ppo_runner.alg.actor_critic, path)
+        # export_policy_as_onnx(ppo_runner.alg.actor_critic, path)
         print('Exported policy as jit script to: ', path)
 
     logger = Logger(env.dt)

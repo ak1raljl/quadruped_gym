@@ -10,10 +10,19 @@
   </visual>
 
   <asset>
-    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072" />
-    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300" />
-    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2" />
-  </asset>
+  <!-- 1 高度场 -->
+  <hfield name="rough_terrain"
+          nrow="10" ncol="10" file="/home/ak1ra/Quadruped/go2_sim2sim/go2_description/height_field.png" 
+          size="2.5 2.5 0.15 0.15"/>
+
+  <!-- 2 纹理 / 材料 -->
+  <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+  <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300"/>
+  <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+
+  <texture type="2d" name="rough_tex" builtin="checker" rgb1="0.7 0.7 0.7" rgb2="0.3 0.3 0.3" width="100" height="100"/>
+  <material name="rough_mat" texture="rough_tex" texrepeat="10 10"/>
+</asset>
 
   <worldbody>
     <light pos="0 0 1.5" dir="0 0 -1" directional="true" />

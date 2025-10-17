@@ -22,10 +22,10 @@ class Go2Cfg( LeggedRobotCfg ):
     class init_state( LeggedRobotCfg.init_state ):
         pos = [0.0, 0.0, 0.42] # x,y,z [m]
         default_joint_angles = { # = target angles [rad] when action = 0.0
-            'FL_hip_joint': 0.1,   # [rad]
-            'RL_hip_joint': 0.1,   # [rad]
-            'FR_hip_joint': -0.1 ,  # [rad]
-            'RR_hip_joint': -0.1,   # [rad]
+            'FL_hip_joint': 0.0,   # [rad]
+            'RL_hip_joint': 0.0,   # [rad]
+            'FR_hip_joint': -0.0 ,  # [rad]
+            'RR_hip_joint': -0.0,   # [rad]
 
             'FL_thigh_joint': 0.8,     # [rad]
             'RL_thigh_joint': 1.,   # [rad]
@@ -75,7 +75,7 @@ class Go2Cfg( LeggedRobotCfg ):
         terminal_body_height = 0.05
         class scales( LeggedRobotCfg.rewards.scales ):
             tracking_lin_vel = 5.0
-            tracking_ang_vel = 0.5
+            tracking_ang_vel = 2.0
             torques = -0.0001
             dof_pos_limits = -10.0
             orientation = -5.0
@@ -85,7 +85,7 @@ class Go2Cfg( LeggedRobotCfg ):
             collision = -5.0
             tracking_contacts_shaped_force = 4.0
             tracking_contacts_shaped_vel = 4.0
-            feet_clearance_cmd_linear = -10.0
+            feet_clearance_cmd_linear = -20.0
             # raibert_heuristic = -2.0
             dof_vel = -1e-4
             dof_pos = -0.0
