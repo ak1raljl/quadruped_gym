@@ -63,7 +63,7 @@
   </asset>
 
   <worldbody>
-    <geom name="ground" type="plane" size="10 10 0.1" pos="0 0 0" quat="1 0 0 0" material="grid_mat" friction="1.0 0.005 0.01"/>
+    <!-- <geom name="ground" type="plane" size="10 10 0.1" pos="0 0 0" quat="1 0 0 0" material="grid_mat" friction="1.0 0.005 0.01"/> -->
     <body name="base_link" pos="0 0 0.445" childclass="go2">  
       <inertial pos="0.021112 0 -0.005366" quat="-0.000543471 0.713435 -0.00173769 0.700719"
         mass="6.921"
