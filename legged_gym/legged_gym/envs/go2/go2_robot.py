@@ -254,20 +254,20 @@ class Go2Robot( LeggedRobot ):
         ).squeeze(1)
         # body roll
         self.commands[env_ids, 11] = 0.0
-        # # stance_width
-        # self.commands[env_ids, 12] = torch_rand_float(
-        #     self.cfg.commands.stance_width_range[0],
-        #     self.cfg.commands.stance_width_range[1],
-        #     (len(env_ids), 1),
-        #     device=self.device
-        # ).squeeze(1)
-        # # stance_length
-        # self.commands[env_ids, 13] = torch_rand_float(
-        #     self.cfg.commands.stance_length_range[0],
-        #     self.cfg.commands.stance_length_range[1],
-        #     (len(env_ids), 1),
-        #     device=self.device
-        # ).squeeze(1)
+        # stance_width
+        self.commands[env_ids, 12] = torch_rand_float(
+            self.cfg.commands.stance_width_range[0],
+            self.cfg.commands.stance_width_range[1],
+            (len(env_ids), 1),
+            device=self.device
+        ).squeeze(1)
+        # stance_length
+        self.commands[env_ids, 13] = torch_rand_float(
+            self.cfg.commands.stance_length_range[0],
+            self.cfg.commands.stance_length_range[1],
+            (len(env_ids), 1),
+            device=self.device
+        ).squeeze(1)
 
         self.commands[env_ids, :2] *= (torch.norm(self.commands[env_ids, :2], dim=1) > 0.2).unsqueeze(1)
 
@@ -439,9 +439,9 @@ class Go2Robot( LeggedRobot ):
             self.obs_scales.gait_phase_cmd,
             self.obs_scales.footswing_height_cmd, 
             self.obs_scales.body_pitch_cmd,
-            self.obs_scales.body_roll_cmd
-            # self.obs_scales.stance_width_cmd,
-            # self.obs_scales.stance_length_cmd
+            self.obs_scales.body_roll_cmd,
+            self.obs_scales.stance_width_cmd,
+            self.obs_scales.stance_length_cmd
         ], device=self.device, requires_grad=False, )[:self.cfg.commands.num_commands]
         self.feet_air_time = torch.zeros(self.num_envs, self.feet_indices.shape[0], dtype=torch.float, device=self.device, requires_grad=False)
         self.last_contacts = torch.zeros(self.num_envs, len(self.feet_indices), dtype=torch.bool, device=self.device, requires_grad=False)
@@ -723,7 +723,9 @@ class Go2Robot( LeggedRobot ):
             desired_xs_nom = torch.tensor([desired_stance_length / 2,  desired_stance_length / 2, -desired_stance_length / 2, -desired_stance_length / 2], device=self.device).unsqueeze(0)
 
         # raibert offsets
-        phases = torch.abs(1.0 - (self.foot_indices * 2.0)) * 1.0 - 0.5
+        # phases = torch.abs(1.0 - (self.foot_indices * 2.0)) * 1.0 - 0.5
+        phases = 1.0 - torch.abs(2.0 * self.foot_indices - 1.0)  # 先映射到 [0, 1] 的三角波
+        phases = phases - 0.5  # 再偏移到 [-0.5, 0.5]
         frequencies = self.commands[:, 4]
         x_vel_des = self.commands[:, 0:1]
         yaw_vel_des = self.commands[:, 2:3]
