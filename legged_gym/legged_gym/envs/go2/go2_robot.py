@@ -719,13 +719,11 @@ class Go2Robot( LeggedRobot ):
             desired_stance_length = self.commands[:, 13:14]
             desired_xs_nom = torch.cat([desired_stance_length / 2, desired_stance_length / 2, -desired_stance_length / 2, -desired_stance_length / 2], dim=1)
         else:
-            desired_stance_length = 0.45
+            desired_stance_length = 0.35
             desired_xs_nom = torch.tensor([desired_stance_length / 2,  desired_stance_length / 2, -desired_stance_length / 2, -desired_stance_length / 2], device=self.device).unsqueeze(0)
 
         # raibert offsets
-        # phases = torch.abs(1.0 - (self.foot_indices * 2.0)) * 1.0 - 0.5
-        phases = 1.0 - torch.abs(2.0 * self.foot_indices - 1.0)  # 先映射到 [0, 1] 的三角波
-        phases = phases - 0.5  # 再偏移到 [-0.5, 0.5]
+        phases = torch.abs(1.0 - (self.foot_indices * 2.0)) * 1.0 - 0.5
         frequencies = self.commands[:, 4]
         x_vel_des = self.commands[:, 0:1]
         yaw_vel_des = self.commands[:, 2:3]
@@ -739,9 +737,30 @@ class Go2Robot( LeggedRobot ):
 
         desired_footsteps_body_frame = torch.cat((desired_xs_nom.unsqueeze(2), desired_ys_nom.unsqueeze(2)), dim=2)
 
-        err_raibert_heuristic = torch.abs(desired_footsteps_body_frame - footsteps_in_body_frame[:, :, 0:2])
-
-        reward = -torch.sum(torch.square(err_raibert_heuristic), dim=(1, 2))
+        # err_raibert_heuristic = torch.abs(desired_footsteps_body_frame - footsteps_in_body_frame[:, :, 0:2])
+        err_raibert_heuristic = desired_footsteps_body_frame - footsteps_in_body_frame[:, :, 0:2]
+        foot_errors = torch.norm(err_raibert_heuristic, dim=2)  # shape: (num_envs, 4)
+        reward = -torch.sum(torch.square(foot_errors), dim=1)
+        
+        # 打印前后脚间距
+        front_x = (footsteps_in_body_frame[:, 0, 0] + footsteps_in_body_frame[:, 1, 0]) / 2  # FR, FL平均
+        rear_x = (footsteps_in_body_frame[:, 2, 0] + footsteps_in_body_frame[:, 3, 0]) / 2   # RR, RL平均
+        stance_length = torch.abs(front_x - rear_x)
+        # print(f"Front: {footsteps_in_body_frame[0, :2, 0]}, Rear: {footsteps_in_body_frame[0, 2:, 0]}, Length: {stance_length[0]:.3f}m,", err_raibert_heuristic)
+        
+        if self.common_step_counter % 100 == 0:  # 每100步打印一次
+            print(f"\n=== Step {self.common_step_counter} ===")
+            print(f"Actual Length: {stance_length[0]:.3f}m")
+            if self.cfg.commands.num_commands >= 14:
+                print(f"Desired Length (from cmd): {self.commands[0, 13]:.3f}m")
+            else:
+                print(f"Desired Length (default): 0.35m")
+            print(f"desired_xs_nom: {desired_xs_nom[0]}")
+            print(f"desired_xs_offset: {desired_xs_offset[0]}")
+            print(f"Error X: {err_raibert_heuristic[0, :, 0]}")
+            print(f"Reward: {-torch.sum(torch.square(err_raibert_heuristic[0])):.4f}")
+        
+        # reward = -torch.sum(torch.square(err_raibert_heuristic), dim=(1, 2))
 
         return reward
     

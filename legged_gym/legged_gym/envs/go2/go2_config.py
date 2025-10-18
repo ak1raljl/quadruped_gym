@@ -80,13 +80,13 @@ class Go2Cfg( LeggedRobotCfg ):
             dof_pos_limits = -10.0
             orientation = -5.0
             # orientation_control = -5.0
-            base_height = -180.0
+            base_height = -240.0
             feet_air_time = 0.0
             collision = -50.0
             tracking_contacts_shaped_force = 40.0
             tracking_contacts_shaped_vel = 40.0
             feet_clearance_cmd_linear = -30.0
-            raibert_heuristic = -40.0
+            raibert_heuristic = -50.0
             dof_vel = -1e-4
             dof_pos = -0.0
             feet_impact_vel = -0.0
@@ -125,7 +125,7 @@ class Go2Cfg( LeggedRobotCfg ):
         limit_aux_reward_coef = [0.0, 0.01]
         limit_compliance = [0.0, 1.0]
         limit_stance_width = [0.10, 0.45]
-        limit_stance_length = [0.35, 0.45]
+        limit_stance_length = [0.30, 0.38]
 
         gait_phase_cmd_range = [0.0, 1.0]
         gait_offset_cmd_range = [0.0, 1.0]
@@ -136,7 +136,7 @@ class Go2Cfg( LeggedRobotCfg ):
         body_pitch_range = [-0.1, 0.1]
         body_roll_range = [-0.0, 0.0]
         stance_width_range = [0.10, 0.45]
-        stance_length_range = [0.35, 0.45]
+        stance_length_range = [0.30, 0.38]
 
         binary_phases = False
 
@@ -175,4 +175,4 @@ class Go2CfgPPO( LeggedRobotCfgPPO ):
     class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
         experiment_name = 'go2'
-        max_iterations = 1500
+        max_iterations = 15000

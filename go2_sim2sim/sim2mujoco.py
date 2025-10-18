@@ -113,7 +113,7 @@ def run_mujoco(policy, cfg):
     body_pitch = 0.0
     body_roll = 0.0
     stance_width = 0.3
-    stance_length = 0.4
+    stance_length = 0.2
 
     gait_indices = 0.0 # FL, RL, FR, RR
     clock_inputs = np.zeros(4, dtype=np.float32)
@@ -268,7 +268,7 @@ if __name__ == '__main__':
         
         class env(Go2Cfg.env):
             frame_stack = 1 
-            num_single_obs = 68  # 与 num_observations 相同
+            num_single_obs = 70  # 与 num_observations 相同
         
     policy = torch.jit.load(args.load_model)
     print("Loaded policy from ", args.load_model)
