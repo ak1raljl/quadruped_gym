@@ -74,23 +74,21 @@ def get_obs(data):
 def pd_control(target_q, q, kp, target_dq, dq, kd):
     '''Calculates torques from position commands
     '''
-    # 注意：target_q应该已经包含了default_dof_pos
     torque_out = (target_q - q) * kp + (target_dq - dq) * kd
     return torque_out
 
 def run_mujoco(policy, cfg):
-    # listener = keyboard.Listener(on_press=on_press)
-    # listener.start()
+    listener = keyboard.Listener(on_press=on_press)
+    listener.start()
     
     model = mujoco.MjModel.from_xml_path(cfg.sim_config.mujoco_model_path)
     model.opt.timestep = cfg.sim_config.dt
     data = mujoco.MjData(model)
     
-    # 设置初始状态
-    data.qpos[2] = 0.42  # 设置初始高度
+    data.qpos[2] = 0.42
     default_dof_pos = cfg.robot_config.default_dof_pos
-    data.qpos[7:19] = default_dof_pos  # 设置初始关节角度
-    mujoco.mj_forward(model, data)  # 更新物理状态
+    data.qpos[7:19] = default_dof_pos
+    mujoco.mj_forward(model, data)
     
     viewer = mujoco.viewer.launch_passive(model, data)
 
@@ -106,50 +104,47 @@ def run_mujoco(policy, cfg):
     count_lowlevel = 0
     commands = np.array([x_vel_cmd, y_vel_cmd, yaw_vel_cmd])
     
-    # 步态参数（与训练配置一致）
-    gait_freq = 2.0  # Hz
+    gait_freq = 3.0  # Hz
     gait_phase = 0.5
     gait_offset = 0.0
     gait_bound = 0.0
     gait_duration = 0.5
-    swing_height = 0.1
+    swing_height = 0.3
     body_pitch = 0.0
     body_roll = 0.0
 
     gait_indices = 0.0 # FL, RL, FR, RR
     clock_inputs = np.zeros(4, dtype=np.float32)
+    transformed_indices = np.zeros(4, dtype=np.float32)
+    dt = cfg.sim_config.dt
+    decim = cfg.sim_config.decimation
+    dt_policy = dt * decim
 
     print(f"观测维度: {cfg.env.num_observations}")
 
-    for step in range(int(cfg.sim_config.sim_duration / cfg.sim_config.dt)):
-        # 获取观测
+    for step in range(int(cfg.sim_config.sim_duration / dt)):
         base_pos, dof_pos, dof_vel, quat, base_lin_vel, base_ang_vel, projected_gravity = get_obs(data)
-
-        gait_indices = (gait_indices + gait_freq * cfg.sim_config.dt) % 1.0
-        
-        # FL, RL, FR, RR 的相位
-        foot_indices = np.array([
-            (gait_indices + gait_phase + gait_offset + gait_bound) % 1.0,  # FL
-            (gait_indices + gait_offset) % 1.0,  # RL
-            (gait_indices + gait_bound) % 1.0,  # FR
-            (gait_indices + gait_phase) % 1.0,  # RR
-        ], dtype=np.float32)
-
-        # foot_indices = np.remainder(foot_indices, 1.0)
-        transformed_indices = np.zeros(4, dtype=np.float32)
-        for i in range(4):
-            phase = foot_indices[i]
-            if phase < gait_duration:
-                # 支撑相：[0, duration] -> [0, 0.5]
-                transformed_indices[i] = phase * (0.5 / gait_duration)
-            else:
-                # 摆动相：[duration, 1] -> [0.5, 1]
-                transformed_indices[i] = 0.5 + (phase - gait_duration) * (0.5 / (1.0 - gait_duration))
-
-        clock_inputs = np.sin(2 * np.pi * transformed_indices)
-
         # 1000hz -> 100hz
-        if count_lowlevel % cfg.sim_config.decimation == 0:
+        if count_lowlevel % decim == 0:
+            gait_indices = (gait_indices + gait_freq * dt_policy) % 1.0
+
+            foot_indices = np.array([
+                (gait_indices + gait_phase + gait_offset + gait_bound) % 1.0,  # FL
+                (gait_indices + gait_offset) % 1.0,  # RL
+                (gait_indices + gait_bound) % 1.0,  # FR
+                (gait_indices + gait_phase) % 1.0,  # RR
+            ], dtype=np.float32)
+            # foot_indices = np.remainder(foot_indices, 1.0)
+            
+            for i in range(4):
+                phase = foot_indices[i]
+                if phase < gait_duration:
+                    transformed_indices[i] = phase * (0.5 / gait_duration)
+                else:
+                    transformed_indices[i] = 0.5 + (phase - gait_duration) * (0.5 / (1.0 - gait_duration))
+
+            clock_inputs = np.sin(2 * np.pi * transformed_indices)
+
             obs = np.zeros([1, cfg.env.num_single_obs], dtype=np.float32)
             # projected_gravity
             obs[0, 0:3] = projected_gravity
@@ -169,25 +164,27 @@ def run_mujoco(policy, cfg):
             obs[0, 9] = gait_offset * cfg.normalization.obs_scales.gait_phase_cmd
             # gait bound
             obs[0, 10] = gait_bound * cfg.normalization.obs_scales.gait_phase_cmd
+            # gait duration
+            obs[0, 11] = gait_duration * cfg.normalization.obs_scales.gait_phase_cmd
             # footswing height
-            obs[0, 11] = swing_height * cfg.normalization.obs_scales.footswing_height_cmd
+            obs[0, 12] = swing_height * cfg.normalization.obs_scales.footswing_height_cmd
             # body pitch
-            obs[0, 12] = body_pitch * cfg.normalization.obs_scales.body_pitch_cmd
+            obs[0, 13] = body_pitch * cfg.normalization.obs_scales.body_pitch_cmd
             # body roll
-            obs[0, 13] = body_roll * cfg.normalization.obs_scales.body_roll_cmd
+            obs[0, 14] = body_roll * cfg.normalization.obs_scales.body_roll_cmd
 
             # dof_pos
-            obs[0, 14:26] = (dof_pos - default_dof_pos) * cfg.normalization.obs_scales.dof_pos
+            obs[0, 15:27] = (dof_pos - default_dof_pos) * cfg.normalization.obs_scales.dof_pos
             # dof_vel
-            obs[0, 26:38] = dof_vel * cfg.normalization.obs_scales.dof_vel
+            obs[0, 27:39] = dof_vel * cfg.normalization.obs_scales.dof_vel
             # actions
-            obs[0, 38:50] = actions
+            obs[0, 39:51] = actions
             # last actions
-            obs[0, 50:62] = last_actions
+            obs[0, 51:63] = last_actions
             # gait indices
-            obs[0, 62] = gait_indices
+            obs[0, 63] = gait_indices
             # clock inputs
-            obs[0, 63:67] = clock_inputs
+            obs[0, 64:68] = clock_inputs
 
             obs = np.clip(obs, -cfg.normalization.clip_observations, cfg.normalization.clip_observations)
             
@@ -201,16 +198,14 @@ def run_mujoco(policy, cfg):
                 end = (i + 1) * cfg.env.num_single_obs
                 policy_input[0, start:end] = hist_obs[i][0, :]
             
-            # 策略推理
             last_actions = actions.copy()
             actions[:] = policy(torch.tensor(policy_input))[0].detach().numpy()
             actions = np.clip(actions, -cfg.normalization.clip_actions, cfg.normalization.clip_actions)
             actions_scaled = actions * cfg.control.action_scale
+            # print(f"Step {step}, Cmd: [{x_vel_cmd:.2f}, {y_vel_cmd:.2f}, {yaw_vel_cmd:.2f}] -> Actions: {actions_scaled}")
             
         target_dq = np.zeros(cfg.env.num_actions, dtype=np.double)
-        target_dq = np.zeros(cfg.env.num_actions, dtype=np.double)
         if step < 50:
-            # 前50步让机器人稳定在初始姿态
             torques = pd_control(
                 target_q=default_dof_pos,
                 q=dof_pos,
@@ -220,7 +215,6 @@ def run_mujoco(policy, cfg):
                 kd=cfg.robot_config.kds
             )
         else:
-            # 目标角度 = 默认角度 + 动作偏移
             torques = pd_control(
                 target_q=default_dof_pos + actions_scaled,
                 q=dof_pos,
@@ -253,7 +247,7 @@ if __name__ == '__main__':
             mujoco_model_path = args.mujoco_model
             sim_duration = 120.0
             dt = 0.001
-            decimation = 4
+            decimation = 20
         
         class robot_config:
             kps = np.array([25.0] * 12, dtype=np.double)  # 与Isaac Gym保持一致：25.0
@@ -262,9 +256,9 @@ if __name__ == '__main__':
             
             default_dof_pos = np.array([
                 0.0, 0.8, -1.5,   # FL
-                0.0, 1.0, -1.5,   # RL
+                0.0, 0.8, -1.5,   # RL
                 -0.0, 0.8, -1.5,  # FR
-                -0.0, 1.0, -1.5,  # RR
+                -0.0, 0.8, -1.5,  # RR
             ], dtype=np.double)
         
         class env(Go2Cfg.env):

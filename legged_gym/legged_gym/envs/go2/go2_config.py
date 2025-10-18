@@ -74,19 +74,19 @@ class Go2Cfg( LeggedRobotCfg ):
         kappa_gait_probs = 0.07
         terminal_body_height = 0.05
         class scales( LeggedRobotCfg.rewards.scales ):
-            tracking_lin_vel = 5.0
-            tracking_ang_vel = 2.0
+            tracking_lin_vel = 30.0
+            tracking_ang_vel = 20.0
             torques = -0.0001
             dof_pos_limits = -10.0
             orientation = -5.0
             # orientation_control = -5.0
-            base_height = -100.0
+            base_height = -180.0
             feet_air_time = 0.0
-            collision = -5.0
-            tracking_contacts_shaped_force = 4.0
-            tracking_contacts_shaped_vel = 4.0
-            feet_clearance_cmd_linear = -20.0
-            # raibert_heuristic = -2.0
+            collision = -50.0
+            tracking_contacts_shaped_force = 40.0
+            tracking_contacts_shaped_vel = 40.0
+            feet_clearance_cmd_linear = -30.0
+            # raibert_heuristic = -5.0
             dof_vel = -1e-4
             dof_pos = -0.0
             feet_impact_vel = -0.0
@@ -94,6 +94,8 @@ class Go2Cfg( LeggedRobotCfg ):
             feet_clearance_cmd = -0.0
             feet_contact_forces = 0.0
             action_rate = -0.01
+            stand_still = -1.0
+            default_hip_pos = -2.0
 
     class commands( LeggedRobotCfg.commands ):
         command_curriculum = True
@@ -131,7 +133,7 @@ class Go2Cfg( LeggedRobotCfg ):
         gait_frequency_cmd_range = [2.0, 4.0]
         gait_duration_cmd_range = [0.5, 0.5]
         footswing_height_range = [0.03, 0.35]
-        body_pitch_range = [-0.0, 0.0]
+        body_pitch_range = [-0.1, 0.1]
         body_roll_range = [-0.0, 0.0]
         stance_width_range = [0.30, 0.35]
         stance_length_range = [0.34, 0.38]

@@ -239,13 +239,12 @@ class Go2Robot( LeggedRobot ):
         # gait duration
         self.commands[env_ids, 8] = 0.5
         # swing height
-        if self.cfg.commands.num_commands > 9:
-            self.commands[env_ids, 9] = torch_rand_float(
-                self.cfg.commands.footswing_height_range[0],
-                self.cfg.commands.footswing_height_range[1],
-                (len(env_ids), 1),
-                device=self.device
-            ).squeeze(1)
+        self.commands[env_ids, 9] = torch_rand_float(
+            self.cfg.commands.footswing_height_range[0],
+            self.cfg.commands.footswing_height_range[1],
+            (len(env_ids), 1),
+            device=self.device
+        ).squeeze(1)
         # body pitch
         self.commands[env_ids, 10] = torch_rand_float(
             self.cfg.commands.body_pitch_range[0],
@@ -663,8 +662,7 @@ class Go2Robot( LeggedRobot ):
             在摆动相引导脚按照指定的高度轨迹运动,形成抛物线式的抬腿动作
                 >鼓励脚在摆动中期达到命令指定的最大高度
                 >保证摆动轨迹平滑
-                >避免障碍物
-                >避免过度抬脚
+                >避免障碍物,避免过度抬脚
         '''
         # get triangular phases for each foot
         phases = 1 - torch.abs(1.0 - torch.clip((self.foot_indices * 2.0) - 1.0, 0.0, 1.0) * 2.0)
@@ -703,6 +701,7 @@ class Go2Robot( LeggedRobot ):
         return torch.sum(torch.square(self.projected_gravity[:, :2] - desired_projected_gravity[:, :2]), dim=1)
 
     def _reward_raibert_heuristic(self):
+        # error = = phases × velocity × (0.5 / frequency)
         cur_footsteps_translated = self.foot_positions - self.base_pos.unsqueeze(1)
         footsteps_in_body_frame = torch.zeros(self.num_envs, 4, 3, device=self.device)
         for i in range(4):
@@ -747,3 +746,8 @@ class Go2Robot( LeggedRobot ):
     def _reward_feet_contact_forces(self):
         # penalize high contact forces
         return torch.sum((torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1) - self.cfg.rewards.max_contact_force).clip(min=0.), dim=1)
+    
+    def _reward_default_hip_pos(self):
+        joint_diff = torch.abs(self.dof_pos[:,0]) + torch.abs(self.dof_pos[:,3]) + torch.abs(self.dof_pos[:,6]) + torch.abs(self.dof_pos[:,9])
+
+        return joint_diff
