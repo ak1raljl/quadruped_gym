@@ -174,22 +174,22 @@ def run_mujoco(policy, cfg):
             obs[0, 13] = body_pitch * cfg.normalization.obs_scales.body_pitch_cmd
             # body roll
             obs[0, 14] = body_roll * cfg.normalization.obs_scales.body_roll_cmd
-            # stance width
-            obs[0, 15] = stance_width * cfg.normalization.obs_scales.stance_width_cmd
-            # stance length
-            obs[0, 16] = stance_length * cfg.normalization.obs_scales.stance_length_cmd
+            # # stance width
+            # obs[0, 15] = stance_width * cfg.normalization.obs_scales.stance_width_cmd
+            # # stance length
+            # obs[0, 16] = stance_length * cfg.normalization.obs_scales.stance_length_cmd
             # dof_pos
-            obs[0, 17:29] = (dof_pos - default_dof_pos) * cfg.normalization.obs_scales.dof_pos
+            obs[0, 15:27] = (dof_pos - default_dof_pos) * cfg.normalization.obs_scales.dof_pos
             # dof_vel
-            obs[0, 29:41] = dof_vel * cfg.normalization.obs_scales.dof_vel
+            obs[0, 27:39] = dof_vel * cfg.normalization.obs_scales.dof_vel
             # actions
-            obs[0, 41:53] = actions
+            obs[0, 39:51] = actions
             # last actions
-            obs[0, 53:65] = last_actions
+            obs[0, 51:63] = last_actions
             # gait indices
-            obs[0, 65] = gait_indices
+            obs[0, 63] = gait_indices
             # clock inputs
-            obs[0, 66:70] = clock_inputs
+            obs[0, 64:68] = clock_inputs
 
             obs = np.clip(obs, -cfg.normalization.clip_observations, cfg.normalization.clip_observations)
             
@@ -268,7 +268,7 @@ if __name__ == '__main__':
         
         class env(Go2Cfg.env):
             frame_stack = 1 
-            num_single_obs = 70  # 与 num_observations 相同
+            num_single_obs = 68  # 与 num_observations 相同
         
     policy = torch.jit.load(args.load_model)
     print("Loaded policy from ", args.load_model)

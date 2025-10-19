@@ -3,7 +3,7 @@ from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobot
 class Go2Cfg( LeggedRobotCfg ):
     class env:
         num_envs = 4096
-        num_observations = 70
+        num_observations = 68
         num_privileged_obs = None # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise 
         num_actions = 12
         env_spacing = 3.  # not used with heightfields/trimeshes 
@@ -86,7 +86,7 @@ class Go2Cfg( LeggedRobotCfg ):
             tracking_contacts_shaped_force = 40.0
             tracking_contacts_shaped_vel = 40.0
             feet_clearance_cmd_linear = -30.0
-            raibert_heuristic = -50.0
+            # raibert_heuristic = -20.0
             dof_vel = -1e-4
             dof_pos = -0.0
             feet_impact_vel = -0.0
@@ -102,7 +102,7 @@ class Go2Cfg( LeggedRobotCfg ):
         resampling_time = 10
         heading_command = False
 
-        num_commands = 14
+        num_commands = 12
 
         lin_vel_x = [-1.0, 1.0] # min max [m/s]
         lin_vel_y = [-1.0, 1.0] # min max [m/s]
@@ -175,4 +175,4 @@ class Go2CfgPPO( LeggedRobotCfgPPO ):
     class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
         experiment_name = 'go2'
-        max_iterations = 15000
+        max_iterations = 1500

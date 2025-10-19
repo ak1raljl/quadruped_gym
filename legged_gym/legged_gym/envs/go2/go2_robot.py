@@ -254,20 +254,20 @@ class Go2Robot( LeggedRobot ):
         ).squeeze(1)
         # body roll
         self.commands[env_ids, 11] = 0.0
-        # stance_width
-        self.commands[env_ids, 12] = torch_rand_float(
-            self.cfg.commands.stance_width_range[0],
-            self.cfg.commands.stance_width_range[1],
-            (len(env_ids), 1),
-            device=self.device
-        ).squeeze(1)
-        # stance_length
-        self.commands[env_ids, 13] = torch_rand_float(
-            self.cfg.commands.stance_length_range[0],
-            self.cfg.commands.stance_length_range[1],
-            (len(env_ids), 1),
-            device=self.device
-        ).squeeze(1)
+        # # stance_width
+        # self.commands[env_ids, 12] = torch_rand_float(
+        #     self.cfg.commands.stance_width_range[0],
+        #     self.cfg.commands.stance_width_range[1],
+        #     (len(env_ids), 1),
+        #     device=self.device
+        # ).squeeze(1)
+        # # stance_length
+        # self.commands[env_ids, 13] = torch_rand_float(
+        #     self.cfg.commands.stance_length_range[0],
+        #     self.cfg.commands.stance_length_range[1],
+        #     (len(env_ids), 1),
+        #     device=self.device
+        # ).squeeze(1)
 
         self.commands[env_ids, :2] *= (torch.norm(self.commands[env_ids, :2], dim=1) > 0.2).unsqueeze(1)
 
@@ -439,9 +439,9 @@ class Go2Robot( LeggedRobot ):
             self.obs_scales.gait_phase_cmd,
             self.obs_scales.footswing_height_cmd, 
             self.obs_scales.body_pitch_cmd,
-            self.obs_scales.body_roll_cmd,
-            self.obs_scales.stance_width_cmd,
-            self.obs_scales.stance_length_cmd
+            self.obs_scales.body_roll_cmd
+            # self.obs_scales.stance_width_cmd,
+            # self.obs_scales.stance_length_cmd
         ], device=self.device, requires_grad=False, )[:self.cfg.commands.num_commands]
         self.feet_air_time = torch.zeros(self.num_envs, self.feet_indices.shape[0], dtype=torch.float, device=self.device, requires_grad=False)
         self.last_contacts = torch.zeros(self.num_envs, len(self.feet_indices), dtype=torch.bool, device=self.device, requires_grad=False)
@@ -737,30 +737,27 @@ class Go2Robot( LeggedRobot ):
 
         desired_footsteps_body_frame = torch.cat((desired_xs_nom.unsqueeze(2), desired_ys_nom.unsqueeze(2)), dim=2)
 
-        # err_raibert_heuristic = torch.abs(desired_footsteps_body_frame - footsteps_in_body_frame[:, :, 0:2])
-        err_raibert_heuristic = desired_footsteps_body_frame - footsteps_in_body_frame[:, :, 0:2]
-        foot_errors = torch.norm(err_raibert_heuristic, dim=2)  # shape: (num_envs, 4)
-        reward = -torch.sum(torch.square(foot_errors), dim=1)
+        err_raibert_heuristic = torch.abs(desired_footsteps_body_frame - footsteps_in_body_frame[:, :, 0:2])
         
         # 打印前后脚间距
-        front_x = (footsteps_in_body_frame[:, 0, 0] + footsteps_in_body_frame[:, 1, 0]) / 2  # FR, FL平均
-        rear_x = (footsteps_in_body_frame[:, 2, 0] + footsteps_in_body_frame[:, 3, 0]) / 2   # RR, RL平均
-        stance_length = torch.abs(front_x - rear_x)
+        # front_x = (footsteps_in_body_frame[:, 0, 0] + footsteps_in_body_frame[:, 1, 0]) / 2  # FR, FL平均
+        # rear_x = (footsteps_in_body_frame[:, 2, 0] + footsteps_in_body_frame[:, 3, 0]) / 2   # RR, RL平均
+        # stance_length = torch.abs(front_x - rear_x)
         # print(f"Front: {footsteps_in_body_frame[0, :2, 0]}, Rear: {footsteps_in_body_frame[0, 2:, 0]}, Length: {stance_length[0]:.3f}m,", err_raibert_heuristic)
         
-        if self.common_step_counter % 100 == 0:  # 每100步打印一次
-            print(f"\n=== Step {self.common_step_counter} ===")
-            print(f"Actual Length: {stance_length[0]:.3f}m")
-            if self.cfg.commands.num_commands >= 14:
-                print(f"Desired Length (from cmd): {self.commands[0, 13]:.3f}m")
-            else:
-                print(f"Desired Length (default): 0.35m")
-            print(f"desired_xs_nom: {desired_xs_nom[0]}")
-            print(f"desired_xs_offset: {desired_xs_offset[0]}")
-            print(f"Error X: {err_raibert_heuristic[0, :, 0]}")
-            print(f"Reward: {-torch.sum(torch.square(err_raibert_heuristic[0])):.4f}")
+        # if self.common_step_counter % 100 == 0:  # 每100步打印一次
+        #     print(f"\n=== Step {self.common_step_counter} ===")
+        #     print(f"Actual Length: {stance_length[0]:.3f}m")
+        #     if self.cfg.commands.num_commands >= 14:
+        #         print(f"Desired Length (from cmd): {self.commands[0, 13]:.3f}m")
+        #     else:
+        #         print(f"Desired Length (default): 0.35m")
+        #     print(f"desired_xs_nom: {desired_xs_nom[0]}")
+        #     print(f"desired_xs_offset: {desired_xs_offset[0]}")
+        #     print(f"Error X: {err_raibert_heuristic[0, :, 0]}")
+        #     print(f"Reward: {-torch.sum(torch.square(err_raibert_heuristic[0])):.4f}")
         
-        # reward = -torch.sum(torch.square(err_raibert_heuristic), dim=(1, 2))
+        reward = -torch.sum(torch.square(err_raibert_heuristic), dim=(1, 2))
 
         return reward
     
