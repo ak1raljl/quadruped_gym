@@ -104,7 +104,7 @@ def run_mujoco(policy, cfg):
     count_lowlevel = 0
     commands = np.array([x_vel_cmd, y_vel_cmd, yaw_vel_cmd])
     
-    gait_freq = 3.0  # Hz
+    gait_freq = 2.0  # Hz
     gait_phase = 0.5
     gait_offset = 0.0
     gait_bound = 0.0
@@ -112,8 +112,8 @@ def run_mujoco(policy, cfg):
     swing_height = 0.3
     body_pitch = 0.0
     body_roll = 0.0
-    stance_width = 0.3
-    stance_length = 0.2
+    # stance_width = 0.3
+    # stance_length = 0.2
 
     gait_indices = 0.0 # FL, RL, FR, RR
     clock_inputs = np.zeros(4, dtype=np.float32)

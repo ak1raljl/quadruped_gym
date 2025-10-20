@@ -9,6 +9,11 @@ from legged_gym.utils.helpers import class_to_dict
 from legged_gym.envs.go2.go2_config import Go2Cfg
 import numpy as np
 
+def get_scale_shift(range):
+    scale = 2. / (range[1] - range[0])
+    shift = (range[1] + range[0]) / 2.
+    return scale, shift
+
 
 class Go2Robot( LeggedRobot ):
     cfg : Go2Cfg
@@ -175,6 +180,16 @@ class Go2Robot( LeggedRobot ):
         if self.add_noise:
             self.obs_buf += (2 * torch.rand_like(self.obs_buf) - 1) * self.noise_scale_vec
         
+        self.privileged_obs_buf = torch.empty(self.num_envs, 0).to(self.device)
+        
+        if self.cfg.env.priv_observe_friction:
+            friction_coeffs_scale, friction_coeffs_shift = get_scale_shift(self.cfg.normalization.friction_range)
+            self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, (self.friction_coeffs[:, 0].unsqueeze(1) - friction_coeffs_shift) * friction_coeffs_scale), dim=1)
+
+        if self.cfg.env.priv_observe_restitution:
+            restitutions_scale, restitutions_shift = get_scale_shift(self.cfg.normalization.restitution_range)
+            self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, (self.restitutions[:, 0].unsqueeze(1) - restitutions_shift) * restitutions_scale), dim=1)
+
         #TODO build privileged obs
     
     #------------- Callbacks --------------
@@ -477,6 +492,8 @@ class Go2Robot( LeggedRobot ):
 
     def _init_custom_buffers__(self):
         # domain randomization properties
+        self.friction_coeffs = self.default_friction * torch.ones(self.num_envs, 4, dtype=torch.float, device=self.device, requires_grad=False)
+        self.restitutions = self.default_restitution * torch.ones(self.num_envs, 4, dtype=torch.float, device=self.device, requires_grad=False)
         self.gravity_vec = to_torch(get_axis_params(-1., self.up_axis_idx), device=self.device).repeat((self.num_envs, 1))
         self.gait_indices = torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)
         self.clock_inputs = torch.zeros(self.num_envs, 4, dtype=torch.float, device=self.device, requires_grad=False)

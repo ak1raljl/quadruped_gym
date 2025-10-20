@@ -17,6 +17,9 @@ class Go2Cfg( LeggedRobotCfg ):
         observe_clock_inputs = True
         observe_contact_states = False
         observe_yaw = False
+        # privileged observations
+        priv_observe_friction = True
+        priv_observe_restitution = False
 
 
     class init_state( LeggedRobotCfg.init_state ):
@@ -74,7 +77,7 @@ class Go2Cfg( LeggedRobotCfg ):
         kappa_gait_probs = 0.07
         terminal_body_height = 0.05
         class scales( LeggedRobotCfg.rewards.scales ):
-            tracking_lin_vel = 30.0
+            tracking_lin_vel = 35.0
             tracking_ang_vel = 20.0
             torques = -0.0001
             dof_pos_limits = -10.0
@@ -94,7 +97,7 @@ class Go2Cfg( LeggedRobotCfg ):
             feet_clearance_cmd = -0.0
             feet_contact_forces = 0.0
             action_rate = -0.01
-            stand_still = -1.0
+            stand_still = -2.0
             default_hip_pos = -2.0
 
     class commands( LeggedRobotCfg.commands ):
@@ -175,4 +178,4 @@ class Go2CfgPPO( LeggedRobotCfgPPO ):
     class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
         experiment_name = 'go2'
-        max_iterations = 1500
+        max_iterations = 15000
