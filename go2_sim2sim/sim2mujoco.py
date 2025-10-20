@@ -243,7 +243,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Deployment script')
     parser.add_argument('--load_model', type=str, default='/home/ak1ra/Quadruped/legged_gym/logs/go2/exported/policies/policy_1.pt')
-    parser.add_argument('--mujoco_model', type=str, default='/home/ak1ra/Quadruped/go2_sim2sim/go2_description/scene.xml')
+    parser.add_argument('--mujoco_model', type=str, default='/home/ak1ra/Quadruped/go2_sim2sim/go2_description/scene_terrain.xml')
     parser.add_argument('--terrain', action='store_true', help='plane or terrain')
     args = parser.parse_args()
 

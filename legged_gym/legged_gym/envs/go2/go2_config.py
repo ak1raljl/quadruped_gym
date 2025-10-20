@@ -4,7 +4,7 @@ class Go2Cfg( LeggedRobotCfg ):
     class env:
         num_envs = 4096
         num_observations = 68
-        num_privileged_obs = None # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise 
+        num_privileged_obs = 79 # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise 
         num_actions = 12
         env_spacing = 3.  # not used with heightfields/trimeshes 
         send_timeouts = True # send time out information to the algorithm
@@ -16,7 +16,6 @@ class Go2Cfg( LeggedRobotCfg ):
         observe_timing_parameter = True
         observe_clock_inputs = True
         observe_contact_states = False
-        observe_yaw = False
         # privileged observations
         priv_observe_friction = True
         priv_observe_restitution = False
@@ -81,24 +80,26 @@ class Go2Cfg( LeggedRobotCfg ):
             tracking_ang_vel = 20.0
             torques = -0.0001
             dof_pos_limits = -10.0
-            orientation = -5.0
-            # orientation_control = -5.0
+            # orientation = -5.0
+            orientation_control = -5.0
             base_height = -240.0
             feet_air_time = 0.0
             collision = -50.0
             tracking_contacts_shaped_force = 40.0
             tracking_contacts_shaped_vel = 40.0
-            feet_clearance_cmd_linear = -30.0
+            feet_clearance_cmd = -0.0
+            feet_clearance_cmd_linear = -50.0
+            feet_contact_vel = -0.0
+            feet_impact_vel = -5.0
             # raibert_heuristic = -20.0
             dof_vel = -1e-4
-            dof_pos = -0.0
-            feet_impact_vel = -0.0
             feet_clearance = -0.0
-            feet_clearance_cmd = -0.0
+
             feet_contact_forces = 0.0
-            action_rate = -0.01
-            stand_still = -2.0
-            default_hip_pos = -2.0
+            # default_hip_pos = -2.0
+
+            base_motion_when_static = -20.0  # 惩罚静止命令时的基座运动
+            xy_position_tracking = -15.0      # 惩罚静止时的位置漂移
 
     class commands( LeggedRobotCfg.commands ):
         command_curriculum = True
@@ -178,4 +179,4 @@ class Go2CfgPPO( LeggedRobotCfgPPO ):
     class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
         experiment_name = 'go2'
-        max_iterations = 15000
+        max_iterations = 1500

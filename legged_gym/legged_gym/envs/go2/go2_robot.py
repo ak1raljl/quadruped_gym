@@ -9,10 +9,11 @@ from legged_gym.utils.helpers import class_to_dict
 from legged_gym.envs.go2.go2_config import Go2Cfg
 import numpy as np
 
-def get_scale_shift(range):
-    scale = 2. / (range[1] - range[0])
-    shift = (range[1] + range[0]) / 2.
-    return scale, shift
+def get_scale_shift(range, device='cpu'):
+    scale_val = 2. / (range[1] - range[0])
+    shift_val = (range[1] + range[0]) / 2.
+    return (torch.tensor(scale_val, device=device, dtype=torch.float32),
+            torch.tensor(shift_val, device=device, dtype=torch.float32))
 
 
 class Go2Robot( LeggedRobot ):
@@ -158,7 +159,7 @@ class Go2Robot( LeggedRobot ):
     def compute_observations(self):
         self.obs_buf = torch.cat((  
             self.projected_gravity, # 3
-            self.commands * self.commands_scale, # 3
+            self.commands * self.commands_scale, # 12
             (self.dof_pos[:, :self.num_actuated_dof] - self.default_dof_pos[:, :self.num_actuated_dof]) * self.obs_scales.dof_pos,
             self.dof_vel[:, :self.num_actuated_dof] * self.obs_scales.dof_vel,
             self.actions
@@ -170,10 +171,6 @@ class Go2Robot( LeggedRobot ):
             self.obs_buf = torch.cat((self.obs_buf, self.gait_indices.unsqueeze(1)), dim=-1)
         if self.cfg.env.observe_clock_inputs:
             self.obs_buf = torch.cat((self.obs_buf, self.clock_inputs), dim=-1)
-        if self.cfg.env.observe_yaw:
-            forward = quat_apply(self.base_quat, self.forward_vec)
-            heading = torch.atan2(forward[:, 1], forward[:, 0]).unsqueeze(1)
-            self.obs_buf = torch.cat((self.obs_buf, heading), dim=-1)
         if self.cfg.env.observe_contact_states:
             self.obs_buf = torch.cat((self.obs_buf, (self.contact_forces[:, self.feet_indices, 2] > 1.).view(self.num_envs, -1) * 1.0), dim=1)
         # add noise if needed
@@ -181,14 +178,30 @@ class Go2Robot( LeggedRobot ):
             self.obs_buf += (2 * torch.rand_like(self.obs_buf) - 1) * self.noise_scale_vec
         
         self.privileged_obs_buf = torch.empty(self.num_envs, 0).to(self.device)
-        
-        if self.cfg.env.priv_observe_friction:
-            friction_coeffs_scale, friction_coeffs_shift = get_scale_shift(self.cfg.normalization.friction_range)
-            self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, (self.friction_coeffs[:, 0].unsqueeze(1) - friction_coeffs_shift) * friction_coeffs_scale), dim=1)
 
-        if self.cfg.env.priv_observe_restitution:
-            restitutions_scale, restitutions_shift = get_scale_shift(self.cfg.normalization.restitution_range)
-            self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, (self.restitutions[:, 0].unsqueeze(1) - restitutions_shift) * restitutions_scale), dim=1)
+        self.privileged_obs_buf = torch.cat((  
+                                    self.base_lin_vel * self.obs_scales.lin_vel,
+                                    self.base_ang_vel  * self.obs_scales.ang_vel,
+                                    self.projected_gravity,
+                                    self.commands * self.commands_scale,
+                                    (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
+                                    self.dof_vel * self.obs_scales.dof_vel,
+                                    self.actions,
+                                    ),dim=-1)
+        self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, self.last_actions), dim=-1)
+        self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, self.gait_indices.unsqueeze(1)), dim=-1)
+        self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, self.clock_inputs), dim=-1)
+        forward = quat_apply(self.base_quat, self.forward_vec)
+        heading = torch.atan2(forward[:, 1], forward[:, 0]).unsqueeze(1)
+        self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, heading), dim=-1)
+        self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, (self.contact_forces[:, self.feet_indices, 2] > 1.).view(self.num_envs, -1) * 1.0), dim=1)
+        # if self.cfg.env.priv_observe_friction:
+        #     friction_coeffs_scale, friction_coeffs_shift = get_scale_shift(self.cfg.normalization.friction_range, device=self.device)
+        #     self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, (self.friction_coeffs[:, 0].unsqueeze(1) - friction_coeffs_shift) * friction_coeffs_scale), dim=1)
+
+        # if self.cfg.env.priv_observe_restitution:
+        #     restitutions_scale, restitutions_shift = get_scale_shift(self.cfg.normalization.restitution_range, device=self.device)
+        #     self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, (self.restitutions[:, 0].unsqueeze(1) - restitutions_shift) * restitutions_scale), dim=1)
 
         #TODO build privileged obs
     
@@ -386,8 +399,6 @@ class Go2Robot( LeggedRobot ):
             noise_vec = torch.cat((noise_vec, torch.zeros(1)), dim=0)
         if self.cfg.env.observe_clock_inputs:
             noise_vec = torch.cat((noise_vec, torch.zeros(4)), dim=0)
-        if self.cfg.env.observe_yaw:
-            noise_vec = torch.cat((noise_vec, torch.zeros(1),), dim=0)
         if self.cfg.env.observe_contact_states:
             noise_vec = torch.cat((noise_vec, torch.ones(4) * noise_scales.contact_states * noise_level, ), dim=0)
 
@@ -698,7 +709,7 @@ class Go2Robot( LeggedRobot ):
                 >鼓励零速着地或向上缓冲
         '''
         # calculate vertical foot velocities at previous step
-        prev_foot_velocities = self.prev_foot_velocities[:, :, 2].view(self.env.num_envs, -1)
+        prev_foot_velocities = self.prev_foot_velocities[:, :, 2].view(self.num_envs, -1)
         # measure if feet are in contact
         contact_states = torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1) > 1.0
         # penalize high downward velocities when in contact
@@ -786,3 +797,49 @@ class Go2Robot( LeggedRobot ):
         joint_diff = torch.abs(self.dof_pos[:,0]) + torch.abs(self.dof_pos[:,3]) + torch.abs(self.dof_pos[:,6]) + torch.abs(self.dof_pos[:,9])
 
         return joint_diff
+    
+
+    def _reward_base_motion_when_static(self):
+        """
+        当速度命令接近0时,惩罚基座的线速度和角速度
+        防止原地踏步时机器人漂移
+        """
+        # 计算速度命令的范数
+        lin_vel_cmd_norm = torch.norm(self.commands[:, :2], dim=1)  # xy平面线速度命令
+        ang_vel_cmd_norm = torch.abs(self.commands[:, 2])  # yaw角速度命令
+        
+        # 判断是否为静止命令(阈值可调整)
+        is_static = (lin_vel_cmd_norm < 0.1) & (ang_vel_cmd_norm < 0.1)
+        
+        # 计算实际的基座运动
+        base_lin_vel_penalty = torch.norm(self.base_lin_vel[:, :2], dim=1)  # xy平面实际线速度
+        base_ang_vel_penalty = torch.abs(self.base_ang_vel[:, 2])  # 实际yaw角速度
+        
+        # 只在静止命令时惩罚运动
+        total_penalty = (base_lin_vel_penalty + base_ang_vel_penalty) * is_static.float()
+        
+        return total_penalty
+
+    def _reward_xy_position_tracking(self):
+        """
+        当速度命令为0时,惩罚xy平面位置的变化
+        """
+        # 计算速度命令的范数
+        vel_cmd_norm = torch.sqrt(
+            torch.norm(self.commands[:, :2], dim=1)**2 + 
+            self.commands[:, 2]**2
+        )
+        
+        # 判断是否为静止命令
+        is_static = vel_cmd_norm < 0.1
+        
+        # 计算相对于初始位置的xy位移(需要记录每次reset时的位置)
+        if not hasattr(self, 'target_base_pos_xy'):
+            self.target_base_pos_xy = self.base_pos[:, :2].clone()
+        
+        # 在reset时更新目标位置
+        # 这里简化为惩罚xy平面的速度积分
+        xy_displacement = self.base_lin_vel[:, :2] * self.dt
+        displacement_penalty = torch.norm(xy_displacement, dim=1) * is_static.float()
+        
+        return displacement_penalty
