@@ -1,4 +1,4 @@
-from legged_gym.envs.go2.go2_config import Go2Cfg
+from legged_gym.envs.go2.go2_flat_config import Go2FlatCfg
 import math
 import numpy as np
 import mujoco, mujoco.viewer
@@ -104,11 +104,11 @@ def run_mujoco(policy, cfg):
     count_lowlevel = 0
     commands = np.array([x_vel_cmd, y_vel_cmd, yaw_vel_cmd])
     
-    gait_freq = 2.0  # Hz
-    gait_phase = 0.5
+    gait_freq = 3.0  # Hz
+    gait_phase = 0.0
     gait_offset = 0.0
     gait_bound = 0.0
-    gait_duration = 0.5
+    gait_duration = 0.25
     swing_height = 0.3
     body_pitch = 0.0
     body_roll = 0.0
@@ -247,7 +247,7 @@ if __name__ == '__main__':
     parser.add_argument('--terrain', action='store_true', help='plane or terrain')
     args = parser.parse_args()
 
-    class Sim2simCfg( Go2Cfg ):
+    class Sim2simCfg( Go2FlatCfg ):
         class sim_config:
             mujoco_model_path = args.mujoco_model
             sim_duration = 120.0
@@ -265,9 +265,9 @@ if __name__ == '__main__':
                 -0.0, 0.8, -1.5,  # FR
                 -0.0, 0.8, -1.5,  # RR
             ], dtype=np.double)
-        
-        class env(Go2Cfg.env):
-            frame_stack = 1 
+
+        class env(Go2FlatCfg.env):
+            frame_stack = 1
             num_single_obs = 68  # 与 num_observations 相同
         
     policy = torch.jit.load(args.load_model)

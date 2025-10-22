@@ -1,10 +1,10 @@
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
 
-class Go2Cfg( LeggedRobotCfg ):
-    class env:
+class GO2RoughCfg( LeggedRobotCfg ):
+    class env(LeggedRobotCfg.env):
         num_envs = 4096
         num_observations = 68
-        num_privileged_obs = 79 # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise 
+        num_privileged_obs = 79
         num_actions = 12
         env_spacing = 3.  # not used with heightfields/trimeshes 
         send_timeouts = True # send time out information to the algorithm
@@ -41,10 +41,14 @@ class Go2Cfg( LeggedRobotCfg ):
         }
 
     class terrain( LeggedRobotCfg.terrain ):
-        mesh_type = 'plane' # "heightfield" # none, plane, heightfield or trimesh
+        mesh_type = 'trimesh' # "heightfield" # none, plane, heightfield or trimesh
+        curriculum = True
         measure_heights = True
-        border_size = 50
-        teleport_thresh = 0.3 # height threshold for teleporting robots
+        border_size = 15
+        if mesh_type == 'heightfield' or mesh_type == 'trimesh':
+            terrain_proportions = [0.2, 0.2, 0.3, 0.3, 0.0]
+            num_rows = 10 # number of terrain rows (levels)
+            num_cols = 10 # number of terrain cols (types)
         x_init_range = 1.
         y_init_range = 1.
         yaw_init_range = 0.
@@ -80,26 +84,24 @@ class Go2Cfg( LeggedRobotCfg ):
             tracking_ang_vel = 20.0
             torques = -0.0001
             dof_pos_limits = -10.0
-            # orientation = -5.0
-            orientation_control = -5.0
+            orientation = -20.0
+            # orientation_control = -5.0
             base_height = -240.0
             feet_air_time = 0.0
-            collision = -50.0
-            tracking_contacts_shaped_force = 40.0
-            tracking_contacts_shaped_vel = 40.0
+            collision = -250.0
+            tracking_contacts_shaped_force = 4.0
+            tracking_contacts_shaped_vel = 4.0
             feet_clearance_cmd = -0.0
-            feet_clearance_cmd_linear = -50.0
-            feet_contact_vel = -0.0
-            feet_impact_vel = -5.0
+            # feet_clearance_cmd_linear = -30.0
+            # feet_contact_vel = -10.0
+            feet_impact_vel = -10.0
             # raibert_heuristic = -20.0
             dof_vel = -1e-4
             feet_clearance = -0.0
-
+            stand_still = -10.0
+            
             feet_contact_forces = 0.0
             # default_hip_pos = -2.0
-
-            base_motion_when_static = -20.0  # 惩罚静止命令时的基座运动
-            xy_position_tracking = -15.0      # 惩罚静止时的位置漂移
 
     class commands( LeggedRobotCfg.commands ):
         command_curriculum = True
@@ -172,11 +174,11 @@ class Go2Cfg( LeggedRobotCfg ):
     class noise( LeggedRobotCfg.noise ):
         class noise_scales( LeggedRobotCfg.noise.noise_scales ):
             contact_states = 0.05
-            
-class Go2CfgPPO( LeggedRobotCfgPPO ):
+
+class GO2RoughCfgPPO( LeggedRobotCfgPPO ):
     class algorithm( LeggedRobotCfgPPO.algorithm ):
         entropy_coef = 0.01
     class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
-        experiment_name = 'go2'
-        max_iterations = 1500
+        experiment_name = 'rough_go2'
+        max_iterations = 50000

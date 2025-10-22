@@ -1,6 +1,6 @@
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
 
-class Cyberdog2FlatCfg( LeggedRobotCfg ):
+class Go2FlatCfg( LeggedRobotCfg ):
     class env:
         num_envs = 4096
         num_observations = 68
@@ -29,21 +29,25 @@ class Cyberdog2FlatCfg( LeggedRobotCfg ):
             'FR_hip_joint': -0.0 ,  # [rad]
             'RR_hip_joint': -0.0,   # [rad]
 
-            'FL_thigh_joint': 0.66,     # [rad]
-            'RL_thigh_joint': 0.66,   # [rad]
-            'FR_thigh_joint': 0.66,     # [rad]
-            'RR_thigh_joint': 0.66,   # [rad]
+            'FL_thigh_joint': 0.8,     # [rad]
+            'RL_thigh_joint': 1.,   # [rad]
+            'FR_thigh_joint': 0.8,     # [rad]
+            'RR_thigh_joint': 1.,   # [rad]
 
-            'FL_calf_joint': -1.17,   # [rad]
-            'RL_calf_joint': -1.17,    # [rad]
-            'FR_calf_joint': -1.17,  # [rad]
-            'RR_calf_joint': -1.17,    # [rad]
+            'FL_calf_joint': -1.5,   # [rad]
+            'RL_calf_joint': -1.5,    # [rad]
+            'FR_calf_joint': -1.5,  # [rad]
+            'RR_calf_joint': -1.5,    # [rad]
         }
 
     class terrain( LeggedRobotCfg.terrain ):
         mesh_type = 'plane' # "heightfield" # none, plane, heightfield or trimesh
         measure_heights = True
         border_size = 50
+        if mesh_type == 'heightfield' or mesh_type == 'trimesh':
+            terrain_proportions = [0.1, 0.1, 0.3, 0.3, 0.2]
+            num_rows = 10 # number of terrain rows (levels)
+            num_cols = 10 # number of terrain cols (types)
         x_init_range = 1.
         y_init_range = 1.
         yaw_init_range = 0.
@@ -53,16 +57,16 @@ class Cyberdog2FlatCfg( LeggedRobotCfg ):
     class control( LeggedRobotCfg.control):
         # PD Drive parameters:
         control_type = 'P'
-        stiffness = {'joint': 20.0}  # [N*m/rad]
-        damping = {'joint': 0.5}     # [N*m*s/rad]
+        stiffness = {'joint': 25.}  # [N*m/rad]
+        damping = {'joint': 0.6}     # [N*m*s/rad]
         # action scale: target angle = actionScale * action + defaultAngle
         action_scale = 0.25
         # decimation: Number of control action updates @ sim DT per policy DT
         decimation = 4
 
     class asset( LeggedRobotCfg.asset ):
-        file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/cyberdog2/urdf/cyberdog2.urdf'
-        name = "cyberdog2"
+        file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/go2/urdf/go2.urdf'
+        name = "go2"
         foot_name = "foot"
         penalize_contacts_on = ["thigh", "calf"]
         terminate_after_contacts_on = ["base"]
@@ -71,7 +75,7 @@ class Cyberdog2FlatCfg( LeggedRobotCfg ):
     class rewards( LeggedRobotCfg.rewards ):
         use_terminal_body_height = True
         soft_dof_pos_limit = 0.9
-        base_height_target = 0.28
+        base_height_target = 0.34
         kappa_gait_probs = 0.07
         terminal_body_height = 0.05
         class scales( LeggedRobotCfg.rewards.scales ):
@@ -93,8 +97,9 @@ class Cyberdog2FlatCfg( LeggedRobotCfg ):
             # raibert_heuristic = -20.0
             dof_vel = -1e-4
             feet_clearance = -0.0
+
             feet_contact_forces = 0.0
-            default_hip_pos = -2.0
+            # default_hip_pos = -2.0
 
     class commands( LeggedRobotCfg.commands ):
         command_curriculum = True
@@ -167,13 +172,11 @@ class Cyberdog2FlatCfg( LeggedRobotCfg ):
     class noise( LeggedRobotCfg.noise ):
         class noise_scales( LeggedRobotCfg.noise.noise_scales ):
             contact_states = 0.05
-
-class Cyberdog2FlatCfgPPO( LeggedRobotCfgPPO ):
+            
+class Go2FlatCfgPPO( LeggedRobotCfgPPO ):
     class algorithm( LeggedRobotCfgPPO.algorithm ):
         entropy_coef = 0.01
-    class policy( LeggedRobotCfgPPO.policy ):
-        activation = 'elu' # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
     class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
-        experiment_name = 'cyberdog2_plane'
+        experiment_name = 'go2'
         max_iterations = 1500

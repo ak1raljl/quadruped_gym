@@ -7,12 +7,12 @@ class Cyberdog2RoughCfg( LeggedRobotCfg ):
     
     class terrain( LeggedRobotCfg.terrain ):
         mesh_type = 'trimesh'
-        border_size = 15 # [m] 边界大小
+        border_size = 25 # [m] 边界大小
         # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete, flat]
-        terrain_proportions = [0.1, 0.1, 0.3, 0.3, 0.2]
+        terrain_proportions = [0.2, 0.2, 0.2, 0.2, 0.2]
         # terrain_proportions = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0] # 上楼梯
-        num_rows = 10 # number of terrain rows (levels)
-        num_cols = 10 # number of terrain cols (types)
+        num_rows = 15 # number of terrain rows (levels)
+        num_cols = 15 # number of terrain cols (types)
         # measured_points_x = [-1.0, -0.9, -0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0., 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] # 测量点的x位置 1.4mx2.0m rectangle (without center line)
         # measured_points_y = [-0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0., 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7] # 测量点的y位置
 

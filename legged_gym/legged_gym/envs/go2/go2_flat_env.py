@@ -6,18 +6,12 @@ import os
 import torch
 from legged_gym.utils.math import quat_apply_yaw
 from legged_gym.utils.helpers import class_to_dict
-from legged_gym.envs.cyberdog2.cyberdog2_flat_config import Cyberdog2FlatCfg
+from legged_gym.envs.go2.go2_flat_config import Go2FlatCfg
 import numpy as np
 
-def get_scale_shift(range, device='cpu'):
-    scale_val = 2. / (range[1] - range[0])
-    shift_val = (range[1] + range[0]) / 2.
-    return (torch.tensor(scale_val, device=device, dtype=torch.float32),
-            torch.tensor(shift_val, device=device, dtype=torch.float32))
 
-
-class Cyberdog2Robot( LeggedRobot ):
-    cfg : Cyberdog2FlatCfg
+class Go2FlatRobot( LeggedRobot ):
+    cfg : Go2FlatCfg
     def __init__(self, cfg, sim_params, physics_engine, sim_device, headless):
         self.cfg = cfg
         self.sim_params = sim_params
@@ -194,15 +188,6 @@ class Cyberdog2Robot( LeggedRobot ):
         heading = torch.atan2(forward[:, 1], forward[:, 0]).unsqueeze(1)
         self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, heading), dim=-1)
         self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, (self.contact_forces[:, self.feet_indices, 2] > 1.).view(self.num_envs, -1) * 1.0), dim=1)
-        # if self.cfg.env.priv_observe_friction:
-        #     friction_coeffs_scale, friction_coeffs_shift = get_scale_shift(self.cfg.normalization.friction_range, device=self.device)
-        #     self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, (self.friction_coeffs[:, 0].unsqueeze(1) - friction_coeffs_shift) * friction_coeffs_scale), dim=1)
-
-        # if self.cfg.env.priv_observe_restitution:
-        #     restitutions_scale, restitutions_shift = get_scale_shift(self.cfg.normalization.restitution_range, device=self.device)
-        #     self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, (self.restitutions[:, 0].unsqueeze(1) - restitutions_shift) * restitutions_scale), dim=1)
-
-        #TODO build privileged obs
     
     #------------- Callbacks --------------
     def _post_physics_step_callback(self):
