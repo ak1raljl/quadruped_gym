@@ -89,10 +89,10 @@ class GO2RoughCfg( LeggedRobotCfg ):
             base_height = -240.0
             feet_air_time = 0.0
             collision = -250.0
-            tracking_contacts_shaped_force = 4.0
-            tracking_contacts_shaped_vel = 4.0
+            tracking_contacts_shaped_force = 40.0
+            tracking_contacts_shaped_vel = 40.0
             feet_clearance_cmd = -0.0
-            # feet_clearance_cmd_linear = -30.0
+            feet_clearance_cmd_linear = -30.0
             # feet_contact_vel = -10.0
             feet_impact_vel = -10.0
             # raibert_heuristic = -20.0
@@ -101,7 +101,7 @@ class GO2RoughCfg( LeggedRobotCfg ):
             stand_still = -10.0
             
             feet_contact_forces = 0.0
-            # default_hip_pos = -2.0
+            default_hip_pos = -5.0
 
     class commands( LeggedRobotCfg.commands ):
         command_curriculum = True

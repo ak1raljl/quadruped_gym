@@ -99,7 +99,8 @@ class Go2FlatCfg( LeggedRobotCfg ):
             feet_clearance = -0.0
 
             feet_contact_forces = 0.0
-            # default_hip_pos = -2.0
+            default_hip_pos = -5.0
+            stand_still = -10.0
 
     class commands( LeggedRobotCfg.commands ):
         command_curriculum = True

@@ -266,6 +266,9 @@ class Go2FlatRobot( LeggedRobot ):
         ).squeeze(1)
         # body roll
         self.commands[env_ids, 11] = 0.0
+
+        if (torch.norm(self.commands[env_ids, :2], dim=1) > 0.2).unsqueeze(1) is False:
+            self.commands[env_ids, 3:10] = 0.0
         # # stance_width
         # self.commands[env_ids, 12] = torch_rand_float(
         #     self.cfg.commands.stance_width_range[0],

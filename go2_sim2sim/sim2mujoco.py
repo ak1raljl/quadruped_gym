@@ -104,14 +104,16 @@ def run_mujoco(policy, cfg):
     count_lowlevel = 0
     commands = np.array([x_vel_cmd, y_vel_cmd, yaw_vel_cmd])
     
-    gait_freq = 3.0  # Hz
-    gait_phase = 0.0
+    gait_freq = 2.0  # Hz
+    gait_phase = 0.5
     gait_offset = 0.0
     gait_bound = 0.0
-    gait_duration = 0.25
+    gait_duration = 0.5
     swing_height = 0.3
     body_pitch = 0.0
     body_roll = 0.0
+    
+
     # stance_width = 0.3
     # stance_length = 0.2
 
@@ -127,7 +129,22 @@ def run_mujoco(policy, cfg):
     for step in range(int(cfg.sim_config.sim_duration / dt)):
         base_pos, dof_pos, dof_vel, quat, base_lin_vel, base_ang_vel, projected_gravity = get_obs(data)
         # 1000hz -> 100hz
+        
         if count_lowlevel % decim == 0:
+            if np.abs(x_vel_cmd) < 0.01 and np.abs(y_vel_cmd) < 0.01 and np.abs(yaw_vel_cmd) < 0.01:
+                gait_freq = 0.0  # Hz
+                gait_phase = 0.0
+                gait_offset = 0.0
+                gait_bound = 0.0
+                gait_duration = 0.0
+                swing_height = 0.0
+            else:
+                gait_freq = 3.0  # Hz
+                gait_phase = 0.5
+                gait_offset = 0.0
+                gait_bound = 0.0
+                gait_duration = 0.5
+                swing_height = 0.3
             gait_indices = (gait_indices + gait_freq * dt_policy) % 1.0
 
             foot_indices = np.array([
