@@ -98,10 +98,10 @@ class GO2RoughCfg( LeggedRobotCfg ):
             # raibert_heuristic = -20.0
             dof_vel = -1e-4
             feet_clearance = -0.0
-            stand_still = -10.0
+            # stand_still = -10.0
             
             feet_contact_forces = 0.0
-            default_hip_pos = -5.0
+            default_hip_pos = -20.0
 
     class commands( LeggedRobotCfg.commands ):
         command_curriculum = True

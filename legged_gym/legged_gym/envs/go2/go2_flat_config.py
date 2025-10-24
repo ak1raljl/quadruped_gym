@@ -78,6 +78,7 @@ class Go2FlatCfg( LeggedRobotCfg ):
         base_height_target = 0.34
         kappa_gait_probs = 0.07
         terminal_body_height = 0.05
+        only_positive_rewards = False
         class scales( LeggedRobotCfg.rewards.scales ):
             tracking_lin_vel = 35.0
             tracking_ang_vel = 20.0
@@ -100,7 +101,7 @@ class Go2FlatCfg( LeggedRobotCfg ):
 
             feet_contact_forces = 0.0
             default_hip_pos = -5.0
-            stand_still = -10.0
+            standing_still = -10.0
 
     class commands( LeggedRobotCfg.commands ):
         command_curriculum = True

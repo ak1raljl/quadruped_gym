@@ -131,7 +131,7 @@ def run_mujoco(policy, cfg):
         # 1000hz -> 100hz
         
         if count_lowlevel % decim == 0:
-            if np.abs(x_vel_cmd) < 0.01 and np.abs(y_vel_cmd) < 0.01 and np.abs(yaw_vel_cmd) < 0.01:
+            if np.abs(x_vel_cmd) < 0.1 and np.abs(y_vel_cmd) < 0.1 and np.abs(yaw_vel_cmd) < 0.1:
                 gait_freq = 0.0  # Hz
                 gait_phase = 0.0
                 gait_offset = 0.0
@@ -144,7 +144,7 @@ def run_mujoco(policy, cfg):
                 gait_offset = 0.0
                 gait_bound = 0.0
                 gait_duration = 0.5
-                swing_height = 0.3
+                swing_height = 0.03
             gait_indices = (gait_indices + gait_freq * dt_policy) % 1.0
 
             foot_indices = np.array([

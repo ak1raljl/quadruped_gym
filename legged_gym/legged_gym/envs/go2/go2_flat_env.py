@@ -267,8 +267,10 @@ class Go2FlatRobot( LeggedRobot ):
         # body roll
         self.commands[env_ids, 11] = 0.0
 
-        if (torch.norm(self.commands[env_ids, :2], dim=1) > 0.2).unsqueeze(1) is False:
-            self.commands[env_ids, 3:10] = 0.0
+        vel_norm = torch.norm(self.commands[env_ids, :2], dim=1)
+        small_vel_mask = vel_norm <= 0.2
+        self.commands[env_ids[small_vel_mask], 3:10] = 0.0
+        self.commands[env_ids, :2] *= (vel_norm > 0.2).unsqueeze(1)
         # # stance_width
         # self.commands[env_ids, 12] = torch_rand_float(
         #     self.cfg.commands.stance_width_range[0],
@@ -288,12 +290,22 @@ class Go2FlatRobot( LeggedRobot ):
 
     def _step_contact_targets(self):
         if self.cfg.env.observe_gait_commands:
+            vel_norm = torch.sqrt(
+                self.commands[:, 0]**2 + 
+                self.commands[:, 1]**2 + 
+                self.commands[:, 2]**2
+            )
+            is_static = vel_norm < 0.1
+
             frequencies = self.commands[:, 4] # 频率
             phases = self.commands[:, 5] # 相位偏移
             offsets = self.commands[:, 6] # 偏移量
             bounds = self.commands[:, 7] # 边界
             durations = self.commands[:, 8] # 支撑相占空比
-            self.gait_indices = torch.remainder(self.gait_indices + self.dt * frequencies, 1.0)
+            # self.gait_indices = torch.remainder(self.gait_indices + self.dt * frequencies, 1.0)
+            gait_increment = self.dt * frequencies
+            gait_increment[is_static] = 0.0  # 冻结步态
+            self.gait_indices = torch.remainder(self.gait_indices + gait_increment, 1.0)
 
             foot_indices = [
                 self.gait_indices + phases + offsets + bounds,
@@ -301,7 +313,7 @@ class Go2FlatRobot( LeggedRobot ):
                 self.gait_indices + bounds,
                 self.gait_indices + phases
             ]
-
+            
             self.foot_indices = torch.remainder(torch.cat([foot_indices[i].unsqueeze(1) for i in range(4)], dim=1), 1.0)
             
             for idxs in foot_indices:
@@ -321,11 +333,16 @@ class Go2FlatRobot( LeggedRobot ):
             smoothing_cdf_start = torch.distributions.normal.Normal(0, kappa).cdf  
             for i in range(4):
                 foot_phase = torch.remainder(foot_indices[i], 1.0)
-                self.desired_contact_states[:, i] = (
+                contact_prob = (
                     smoothing_cdf_start(foot_phase) * 
                     (1 - smoothing_cdf_start(foot_phase - 0.5)) +
                     smoothing_cdf_start(foot_phase - 1) * 
                     (1 - smoothing_cdf_start(foot_phase - 0.5 - 1))
+                )
+                self.desired_contact_states[:, i] = torch.where(
+                    is_static, 
+                    torch.ones_like(contact_prob),  # 静止: 四足着地
+                    contact_prob  # 运动: 正常步态
                 )
 
     def _reset_root_states(self, env_ids):
@@ -784,3 +801,19 @@ class Go2FlatRobot( LeggedRobot ):
         joint_diff = torch.abs(self.dof_pos[:,0]) + torch.abs(self.dof_pos[:,3]) + torch.abs(self.dof_pos[:,6]) + torch.abs(self.dof_pos[:,9])
 
         return joint_diff
+    
+    def _reward_standing_still(self):
+        # reward standing still when no velocity command is given
+        vel_cmd_norm = torch.sqrt(
+            self.commands[:, 0]**2 + 
+            self.commands[:, 1]**2 + 
+            self.commands[:, 2]**2
+        )
+        is_static = vel_cmd_norm < 0.1
+        
+        lin_vel_error = torch.sum(torch.square(self.base_lin_vel[:, :2]), dim=1)
+        ang_vel_error = torch.square(self.base_ang_vel[:, 2])
+        
+        penalty = (lin_vel_error + ang_vel_error) * is_static.float()
+        
+        return penalty
