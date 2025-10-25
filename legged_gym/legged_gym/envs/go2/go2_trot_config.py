@@ -167,7 +167,7 @@ class Go2TrotCfgPPO( LeggedRobotCfgPPO ):
     class runner( LeggedRobotCfgPPO.runner ):
         algorithm_class_name = 'PPO'
         num_steps_per_env = 24
-        max_iterations = 1500
+        max_iterations = 50000
 
         save_interval = 100
         experiment_name = 'go2_trot'
