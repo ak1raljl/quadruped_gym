@@ -44,6 +44,8 @@ from .go2.go2_rough_env import Go2RoughRobot
 from .go2.go2_rough_config import GO2RoughCfg, GO2RoughCfgPPO
 from .go2.go2_trot_env import Go2TrotRobot
 from .go2.go2_trot_config import Go2TrotCfg, Go2TrotCfgPPO
+from .go2.go2_stairs_env import Go2StairsRobot
+from .go2.go2_stairs_config import Go2StairsCfg, Go2StairsCfgPPO
 from .cyberdog2.cyberdog2_flat_env import Cyberdog2Robot
 from .cyberdog2.cyberdog2_flat_config import Cyberdog2FlatCfg, Cyberdog2FlatCfgPPO
 
@@ -60,4 +62,5 @@ task_registry.register( "cassie", Cassie, CassieRoughCfg(), CassieRoughCfgPPO() 
 task_registry.register( "go2_flat", Go2FlatRobot, Go2FlatCfg(), Go2FlatCfgPPO() )
 task_registry.register( "go2_rough", Go2RoughRobot, GO2RoughCfg(), GO2RoughCfgPPO() )
 task_registry.register( "go2_trot", Go2TrotRobot, Go2TrotCfg(), Go2TrotCfgPPO() )
+task_registry.register( "go2_stairs", Go2StairsRobot, Go2StairsCfg(), Go2StairsCfgPPO() )
 task_registry.register( "cy_flat", Cyberdog2Robot, Cyberdog2FlatCfg(), Cyberdog2FlatCfgPPO() )
