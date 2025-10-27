@@ -202,9 +202,10 @@ class Go2StairsRobot( LeggedRobot ):
             (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos, # 12
             self.dof_pos * self.obs_scales.dof_pos, # 12
             self.dof_vel * self.obs_scales.dof_vel, # 12
+            self.measured_heights, # 186
             self.actions, # 12
-            self.last_actions, # 12
-        ), dim=-1) # total priv obs dimension: 3 + 3 + 3 + 12 + 12 + 12 + 12 + 12 = 69
+            self.last_actions # 12
+        ), dim=-1) # total priv obs dimension: 3 + 3 + 3 + 12 + 12 + 12 + 186 = 256
 
         if self.add_noise:  
             self.obs_buf += (2 * torch.rand_like(self.obs_buf) - 1) * self.noise_scale_vec
@@ -322,7 +323,9 @@ class Go2StairsRobot( LeggedRobot ):
             forward = quat_apply(self.base_quat, self.forward_vec)
             heading = torch.atan2(forward[:, 1], forward[:, 0])
             self.commands[:, 2] = torch.clip(0.5*wrap_to_pi(self.commands[:, 3] - heading), -1., 1.)
-
+        
+        # if self.cfg.terrain.measure_heights:
+        #     self.measured_heights = self._get_heights()
         if self.cfg.domain_rand.push_robots and  (self.common_step_counter % self.cfg.domain_rand.push_interval == 0):
             self._push_robots()
     
@@ -474,6 +477,7 @@ class Go2StairsRobot( LeggedRobot ):
         self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
         self.base_quat = self.root_states[:, 3:7]
         self.base_euler_xyz = get_euler_xyz_tensor(self.base_quat)
+
         self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(self.num_envs, -1, 3) # shape: num_envs, num_bodies, xyz axis
         self.rigid_state = gymtorch.wrap_tensor(rigid_body_state).view(self.num_envs, self.num_bodies, 13)
 
@@ -793,7 +797,6 @@ class Go2StairsRobot( LeggedRobot ):
         else:
             points = quat_apply_yaw(self.base_quat.repeat(1, self.num_height_points), self.height_points) + (self.root_states[:, :3]).unsqueeze(1)
 
-
         points += self.terrain.cfg.border_size
         points = (points/self.terrain.cfg.horizontal_scale).long()
         px = points[:, :, 0].view(-1)
@@ -939,6 +942,3 @@ class Go2StairsRobot( LeggedRobot ):
         self.feet_air_time *= ~contact_filt
         return rew_airTime
     
-    def _reward_default_pos(self):
-        # Penalize motion at zero commands
-        return torch.sum(torch.abs(self.dof_pos - self.default_dof_pos), dim=1) #* (torch.norm(self.commands[:, :2], dim=1) < 0.1)
