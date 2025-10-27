@@ -113,7 +113,6 @@ def run_mujoco(policy, cfg):
     body_pitch = 0.0
     body_roll = 0.0
     
-
     # stance_width = 0.3
     # stance_length = 0.2
 
@@ -129,7 +128,6 @@ def run_mujoco(policy, cfg):
     for step in range(int(cfg.sim_config.sim_duration / dt)):
         base_pos, dof_pos, dof_vel, quat, base_lin_vel, base_ang_vel, projected_gravity = get_obs(data)
         # 1000hz -> 100hz
-        
         if count_lowlevel % decim == 0:
             if np.abs(x_vel_cmd) < 0.1 and np.abs(y_vel_cmd) < 0.1 and np.abs(yaw_vel_cmd) < 0.1:
                 gait_freq = 0.0  # Hz

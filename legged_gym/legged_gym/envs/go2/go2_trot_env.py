@@ -153,15 +153,15 @@ class Go2TrotRobot( LeggedRobot ):
         stance_mask = self._get_gait_phase()
         contact_mask = self.contact_forces[:, self.feet_indices, 2] > 5.
         self.obs_buf = torch.cat((
-            self.base_ang_vel * self.obs_scales.ang_vel,
-            sin_pos,
-            cos_pos,
-            self.commands[:, :3] * self.commands_scale,
-            (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
-            self.dof_vel * self.obs_scales.dof_vel,
-            self.base_euler_xyz * self.obs_scales.quat,
-            self.actions, # 2
-            self.last_actions # 2
+            self.base_ang_vel * self.obs_scales.ang_vel, # 3
+            sin_pos, # 1
+            cos_pos, # 1
+            self.commands[:, :3] * self.commands_scale, # 3
+            (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos, # 12
+            self.dof_vel * self.obs_scales.dof_vel, # 12
+            self.base_euler_xyz * self.obs_scales.quat, # 3
+            self.actions, # 12
+            self.last_actions # 12
         ), dim=-1)
         
         self.privileged_obs_buf = torch.cat((
