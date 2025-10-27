@@ -96,13 +96,8 @@ def run_mujoco(policy, cfg):
     actions = np.zeros(cfg.env.num_actions, dtype=np.double)
     last_actions = np.zeros(cfg.env.num_actions, dtype=np.double)
     default_dof_vel = np.zeros(cfg.env.num_actions, dtype=np.double)  # 默认关节速度为0
-
-    hist_obs = deque()
-    for _ in range(cfg.env.frame_stack):
-        hist_obs.append(np.zeros([1, cfg.env.num_single_obs], dtype=np.float32))
     
     count_lowlevel = 0
-    commands = np.array([x_vel_cmd, y_vel_cmd, yaw_vel_cmd])
     
     gait_freq = 2.0  # Hz
     gait_phase = 0.5
@@ -162,7 +157,7 @@ def run_mujoco(policy, cfg):
 
             clock_inputs = np.sin(2 * np.pi * transformed_indices)
 
-            obs = np.zeros([1, cfg.env.num_single_obs], dtype=np.float32)
+            obs = np.zeros([1, cfg.env.num_observations], dtype=np.float32)
             # projected_gravity
             obs[0, 0:3] = projected_gravity
             # commands
@@ -208,19 +203,12 @@ def run_mujoco(policy, cfg):
 
             obs = np.clip(obs, -cfg.normalization.clip_observations, cfg.normalization.clip_observations)
             
-            hist_obs.append(obs)
-            hist_obs.popleft()
-
-
-            policy_input = np.zeros([1, cfg.env.num_observations], dtype=np.float32)
-            for i in range(cfg.env.frame_stack):
-                start = i * cfg.env.num_single_obs
-                end = (i + 1) * cfg.env.num_single_obs
-                policy_input[0, start:end] = hist_obs[i][0, :]
-            
+            policy_input = obs
             last_actions = actions.copy()
             actions[:] = policy(torch.tensor(policy_input))[0].detach().numpy()
             actions = np.clip(actions, -cfg.normalization.clip_actions, cfg.normalization.clip_actions)
+            
+            last_actions = actions.copy()
             actions_scaled = actions * cfg.control.action_scale
             # print(f"Step {step}, Cmd: [{x_vel_cmd:.2f}, {y_vel_cmd:.2f}, {yaw_vel_cmd:.2f}] -> Actions: {actions_scaled}")
             
@@ -267,7 +255,7 @@ if __name__ == '__main__':
             mujoco_model_path = args.mujoco_model
             sim_duration = 120.0
             dt = 0.001
-            decimation = 20
+            decimation = 4
         
         class robot_config:
             kps = np.array([25.0] * 12, dtype=np.double)  # 与Isaac Gym保持一致：25.0
@@ -280,10 +268,6 @@ if __name__ == '__main__':
                 -0.0, 0.8, -1.5,  # FR
                 -0.0, 0.8, -1.5,  # RR
             ], dtype=np.double)
-
-        class env(Go2FlatCfg.env):
-            frame_stack = 1
-            num_single_obs = 68  # 与 num_observations 相同
         
     policy = torch.jit.load(args.load_model)
     print("Loaded policy from ", args.load_model)

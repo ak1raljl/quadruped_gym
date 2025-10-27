@@ -1,7 +1,8 @@
-from legged_gym.envs.go2.go2_trot_config import Go2TrotCfg
+from legged_gym.envs.go2.go2_stairs_config import Go2StairsCfg
 import math
 import numpy as np
 import mujoco, mujoco.viewer
+from collections import deque
 from scipy.spatial.transform import Rotation as R
 from legged_gym import LEGGED_GYM_ROOT_DIR
 import torch
@@ -65,7 +66,7 @@ def get_obs(data):
     r = R.from_quat(quat)
     base_lin_vel = r.apply(data.qvel[:3], inverse=True).astype(np.double)
     base_ang_vel = data.qvel[3:6].astype(np.double)
-    
+
     return base_pos, dof_pos, dof_vel, quat, base_lin_vel, base_ang_vel
 
 def pd_control(target_dof_pos, dof_pos, kp, target_dof_vel, dof_vel, kd, cfg):
@@ -91,9 +92,9 @@ def run_mujoco(policy, cfg):
 
     viewer = mujoco.viewer.launch_passive(model, data)
 
-    target_dof_pos = np.zeros((cfg.env.num_actions), dtype=np.double)
+    target_dof_pos = np.zeros(cfg.env.num_actions, dtype=np.double)
     target_dof_vel = np.zeros_like(target_dof_pos)
-    actions = np.zeros((cfg.env.num_actions), dtype=np.double)
+    actions = np.zeros(cfg.env.num_actions, dtype=np.double)
     last_actions = np.zeros(cfg.env.num_actions, dtype=np.double)
 
     count_lowlevel = 1
@@ -108,17 +109,15 @@ def run_mujoco(policy, cfg):
             eu_ang = quaternion_to_euler_array(quat)
             eu_ang[eu_ang > math.pi] -= 2 * math.pi
 
-            obs[0, 0:3] = base_ang_vel * cfg.normalization.obs_scales.ang_vel # 3
-            obs[0, 3] = math.sin(2 * math.pi * count_lowlevel * cfg.sim_config.dt  / cfg.rewards.cycle_time) # 1
-            obs[0, 4] = math.cos(2 * math.pi * count_lowlevel * cfg.sim_config.dt  / cfg.rewards.cycle_time) # 1
-            obs[0, 5] = x_vel_cmd * cfg.normalization.obs_scales.lin_vel # 1
-            obs[0, 6] = y_vel_cmd * cfg.normalization.obs_scales.lin_vel # 1
-            obs[0, 7] = yaw_vel_cmd * cfg.normalization.obs_scales.ang_vel # 1
-            obs[0, 8:20] = (dof_pos - cfg.robot_config.default_dof_pos) * cfg.normalization.obs_scales.dof_pos # 12
-            obs[0, 20:32] = dof_vel * cfg.normalization.obs_scales.dof_vel # 12
-            obs[0, 32:35] = eu_ang * cfg.normalization.obs_scales.quat # 3
-            obs[0, 35:47] = actions # 12
-            obs[0, 47:59] = last_actions # 12
+            obs[0, 0:3] = base_ang_vel * cfg.normalization.obs_scales.ang_vel  # 3
+            obs[0, 3] = x_vel_cmd * cfg.normalization.obs_scales.lin_vel  # 1
+            obs[0, 4] = y_vel_cmd * cfg.normalization.obs_scales.lin_vel  # 1
+            obs[0, 5] = yaw_vel_cmd * cfg.normalization.obs_scales.ang_vel  # 1
+            obs[0, 6:18] = (dof_pos - default_dof_pos) * cfg.normalization.obs_scales.dof_pos  # 12
+            obs[0, 18:30] = dof_vel * cfg.normalization.obs_scales.dof_vel  # 12
+            obs[0, 30:33] = eu_ang * cfg.normalization.obs_scales.quat  # 3
+            obs[0, 33:45] = actions  # 12
+            obs[0, 45:57] = last_actions  # 12
 
             obs = np.clip(obs, -cfg.normalization.clip_observations, cfg.normalization.clip_observations)
 
@@ -129,7 +128,7 @@ def run_mujoco(policy, cfg):
             
             # 更新目标位置
             target_dof_pos[:] = actions * cfg.control.action_scale
-        
+
         if step < 50:
             tau = pd_control(np.zeros(cfg.env.num_actions), dof_pos, cfg.robot_config.kps,
                             np.zeros(cfg.env.num_actions), dof_vel, cfg.robot_config.kds, cfg)
@@ -145,22 +144,23 @@ def run_mujoco(policy, cfg):
     
     viewer.close()
 
+
 if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='Deployment script')
-    parser.add_argument('--load_model', type=str, default='/home/ak1ra/Quadruped/legged_gym/logs/go2_trot/exported/policies/policy_1.pt')
-    parser.add_argument('--mujoco_model', type=str, default='/home/ak1ra/Quadruped/go2_sim2sim/go2_description/scene.xml')
+    parser.add_argument('--load_model', type=str, default='/home/ak1ra/Quadruped/legged_gym/logs/go2_stairs/exported/policies/policy_1.pt')
+    parser.add_argument('--mujoco_model', type=str, default='/home/ak1ra/Quadruped/go2_sim2sim/go2_description/scene_terrain.xml')
     parser.add_argument('--terrain', action='store_true', help='enable terrain')
     args = parser.parse_args()
 
-    class Sim2MujocoTrot( Go2TrotCfg ):
+    class Sim2MujocoStairs( Go2StairsCfg ):
         class sim_config:
             mujoco_model_path = args.mujoco_model
             sim_duration = 120.
             dt = 0.001
-            decimation = 4
-
+            decimation = 20
+        
         class robot_config:
             kps = np.array([20.0] * 12, dtype=np.double)  # 与Isaac Gym保持一致：25.0
             kds = np.array([0.5] * 12, dtype=np.double)   # 与Isaac Gym保持一致：0.6
@@ -171,8 +171,8 @@ if __name__ == '__main__':
                 -0.0, 0.8, -1.5,  # FR
                 -0.0, 0.8, -1.5,  # RR
             ], dtype=np.double)
-        
+
     policy = torch.jit.load(args.load_model)
-    print("Loaded policy from ", args.load_model)
-    
-    run_mujoco(policy, Sim2MujocoTrot)
+    print("Loaded policy from", args.load_model)
+
+    run_mujoco(policy, Sim2MujocoStairs)
