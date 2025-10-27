@@ -17,17 +17,17 @@ joystick_opened = False
 def on_press(key):
     global x_vel_cmd, y_vel_cmd, yaw_vel_cmd
     try:
-        if key.char == 'l':
+        if key == keyboard.Key.up:
             x_vel_cmd += 0.3
-        elif key.char == '.':
+        elif key == keyboard.Key.down:
             x_vel_cmd -= 0.3
-        elif key.char == ',':
+        elif key == keyboard.Key.left:
             yaw_vel_cmd += 0.3
-        elif key.char == '/':
+        elif key == keyboard.Key.right:
             yaw_vel_cmd -= 0.3
-        elif key.char == 'k':
+        elif key.char == ',':
             y_vel_cmd += 0.3
-        elif key.char == ';':
+        elif key.char == '.':
             y_vel_cmd -= 0.3
         elif key.char == 'm':
             x_vel_cmd, y_vel_cmd, yaw_vel_cmd = 0.0, 0.0, 0.0
@@ -164,7 +164,7 @@ if __name__ == '__main__':
         class robot_config:
             kps = np.array([20.0] * 12, dtype=np.double)  # 与Isaac Gym保持一致：25.0
             kds = np.array([0.5] * 12, dtype=np.double)   # 与Isaac Gym保持一致：0.6
-            tau_limit = 40 * np.ones(12, dtype=np.double)
+            tau_limit = 20 * np.ones(12, dtype=np.double)
             default_dof_pos = np.array([
                 0.0, 0.8, -1.5,   # FL
                 0.0, 0.8, -1.5,   # RL

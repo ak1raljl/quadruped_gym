@@ -136,15 +136,15 @@ class Go2StairsCfg( LeggedRobotCfg ):
             orientation = -0.2
             base_height = -100.0
             torques = -0.0001 
-            dof_acc = -1.5e-6
+            dof_acc = -1.5e-7
             dof_vel = -1e-4
-            collision = -10.
+            collision = -50.
             action_rate = -0.01
-            feet_air_time = 8.0
+            feet_air_time = 20.0
             default_pos = -0.6
             stumble = -0.6
             feet_contact_forces = -0.
-            stand_still = -0.
+            stand_still = -2.
 
     class normalization:
         clip_observations = 100.

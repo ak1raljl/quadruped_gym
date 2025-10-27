@@ -16,17 +16,17 @@ joystick_opened = False
 def on_press(key):
     global x_vel_cmd, y_vel_cmd, yaw_vel_cmd
     try:
-        if key.char == 'l':
+        if key == keyboard.Key.up:
             x_vel_cmd += 0.3
-        elif key.char == '.':
+        elif key == keyboard.Key.down:
             x_vel_cmd -= 0.3
-        elif key.char == ',':
+        elif key == keyboard.Key.left:
             yaw_vel_cmd += 0.3
-        elif key.char == '/':
+        elif key == keyboard.Key.right:
             yaw_vel_cmd -= 0.3
-        elif key.char == 'k':
+        elif key.char == ',':
             y_vel_cmd += 0.3
-        elif key.char == ';':
+        elif key.char == '.':
             y_vel_cmd -= 0.3
         elif key.char == 'm':
             x_vel_cmd, y_vel_cmd, yaw_vel_cmd = 0.0, 0.0, 0.0

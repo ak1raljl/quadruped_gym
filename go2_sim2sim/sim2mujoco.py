@@ -20,20 +20,23 @@ joystick_opened = False
 def on_press(key):
     global x_vel_cmd, y_vel_cmd, yaw_vel_cmd
     try:
-        if key.char == 'l':
+        if key == keyboard.Key.up:
             x_vel_cmd += 0.3
-        elif key.char == '.':
+        elif key == keyboard.Key.down:
             x_vel_cmd -= 0.3
-        elif key.char == ',':
+        elif key == keyboard.Key.left:
             yaw_vel_cmd += 0.3
-        elif key.char == '/':
+        elif key == keyboard.Key.right:
             yaw_vel_cmd -= 0.3
-        elif key.char == 'k':
+        elif key.char == ',':
             y_vel_cmd += 0.3
-        elif key.char == ';':
+        elif key.char == '.':
             y_vel_cmd -= 0.3
         elif key.char == 'm':
             x_vel_cmd, y_vel_cmd, yaw_vel_cmd = 0.0, 0.0, 0.0
+        x_vel_cmd = np.clip(x_vel_cmd, -x_vel_max, x_vel_max)
+        y_vel_cmd = np.clip(y_vel_cmd, -y_vel_max, y_vel_max)
+        yaw_vel_cmd = np.clip(yaw_vel_cmd, -yaw_vel_max, yaw_vel_max)
         print(f"Command: {x_vel_cmd:.2f}, {y_vel_cmd:.2f}, {yaw_vel_cmd:.2f}")
     except AttributeError:
         pass
